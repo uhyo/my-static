@@ -11,25 +11,14 @@ const path = require('path');
 const testDir = path.join(pkgDir.sync(__dirname), 'test');
 
 describe('Load Project ', ()=>{
-    it('default filename', done=>{
+    it('basic', done=>{
         findProject({
             cwd: path.join(testDir, 'proj1'),
+            project: 'myst.json',
         }).then(({projdir, projobj})=>{
             expect(projdir).toBe(path.join(testDir, 'proj1'));
             expect(projobj).toEqual({
                 data: 'data/',
-            });
-            done();
-        }).catch(done.fail);
-    });
-    it('custom filename', done=>{
-        findProject({
-            cwd: path.join(testDir, 'proj1'),
-            project: 'custom-myst.json',
-        }).then(({projdir, projobj})=>{
-            expect(projdir).toBe(path.join(testDir, 'proj1'));
-            expect(projobj).toEqual({
-                data: 'data2',
             });
             done();
         }).catch(done.fail);
