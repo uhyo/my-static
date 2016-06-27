@@ -43,8 +43,8 @@ export function renderDirectory(context: RenderContext, dir: string, outDir: str
     });
 }
 
-// fileを1つrenderする
-function renderFile(context: RenderContext, f: string, outDir: string): Promise<any>{
+// fileを1つrenderして保存
+export function renderFile(context: RenderContext, f: string, outDir: string): Promise<any>{
     return new Promise((resolve, reject)=>{
         fs.stat(f, (err, st)=>{
             if (err != null){
@@ -55,40 +55,50 @@ function renderFile(context: RenderContext, f: string, outDir: string): Promise<
                 resolve(renderDirectory(context, f, path.join(outDir, path.basename(f))));
             }else{
                 // This is a file! 
-                const ext = path.extname(f);
-                const func = getRenderer(context, ext);
-                if (func == null){
-                    // funcがないなら何もしない
-                    resolve();
-                    return;
-                }
-                func(f, context.data, (err, html)=>{
-                    if (err != null){
-                        reject(err);
-                    }else{
-                        // ファイルに保存
-                        mkdirp(outDir, err=>{
-                            if (err != null){
-                                reject(err);
-                            }else{
-                                const {
-                                    options: {
-                                        outExt,
-                                    },
-                                } = context;
-                                const targetFile = path.join(outDir, path.basename(f, ext) + outExt);
-                                fs.writeFile(targetFile, html, err=>{
-                                    if (err != null){
-                                        reject(err);
-                                    }else{
-                                        resolve();
-                                    }
-                                });
-                            }
-                        });
+                resolve(renderFileToString(context, f).then(html=>new Promise((resolve, reject)=>{
+                    // ファイルに保存
+                    mkdirp(outDir, err=>{
+                        if (err != null){
+                            reject(err);
+                        }else{
+                            const {
+                                options: {
+                                    outExt,
+                                },
+                            } = context;
+                            const ext = path.extname(f);
+                            const targetFile = path.join(outDir, path.basename(f, ext) + outExt);
+                            fs.writeFile(targetFile, html, err=>{
+                                if (err != null){
+                                    reject(err);
+                                }else{
+                                    resolve();
+                                }
+                            });
+                        }
+                    });
+                })).catch(reject));
+            }
+        });
+    });
+}
 
-                    }
-                });
+// fileをstringにrender
+// renderできないファイルはnullを返す
+export function renderFileToString(context: RenderContext, file: string): Promise<string>{
+    return new Promise((resolve, reject)=>{
+        const ext = path.extname(file);
+        const func = getRenderer(context, ext);
+        if (func == null){
+            // funcがないなら何もしない
+            resolve(null);
+            return;
+        }
+        func(file, context.data, (err, html)=>{
+            if (err != null){
+                reject(err);
+            }else{
+                resolve(html);
             }
         });
     });
