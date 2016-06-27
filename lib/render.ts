@@ -123,15 +123,18 @@ function getRenderer({options, renderers, projdir}: RenderContext, ext: string):
 
 // require modules from local is possible
 function localRequire(name: string, projdir: string): any{
-    const lc = resolve.sync(name, {
-        basedir: projdir,
-    });
-    if (lc){
-        return require(lc);
-    }
     try {
-        return require(name);
-    }catch (e){
-        return null;
+        const lc = resolve.sync(name, {
+            basedir: projdir,
+        });
+        if (lc){
+            return require(lc);
+        }
+    }finally {
+        try {
+            return require(name);
+        }catch (e){
+            return null;
+        }
     }
 }

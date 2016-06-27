@@ -10,18 +10,38 @@ import {
 } from '../lib/render';
 
 const pkgDir = require('pkg-dir');
+const fs = require('fs');
 const path = require('path');
+const mockFs = require('mock-fs');
+const mountfs = require('mountfs');
+mountfs.patchInPlace();
 
 // test files.
 const testDir = path.join(pkgDir.sync(__dirname), 'test');
 
 describe('Load Project ', ()=>{
+    const mnt = path.join(__dirname, 'mockfs');
+    beforeEach(()=>{
+        const mock = mockFs.fs({
+            '/proj1': {
+                'myst.json': `{
+    "data": "data/"
+}`,
+            },
+        });
+        fs.mount(mnt, mock);
+    });
+    afterEach(()=>{
+        fs.unmount(mnt);
+    });
+
     it('basic', done=>{
+        const proj1Dir = path.join(mnt, 'proj1');
         findProject({
-            cwd: path.join(testDir, 'proj1'),
+            cwd: proj1Dir,
             project: 'myst.json',
         }).then(({projdir, projobj})=>{
-            expect(projdir).toBe(path.join(testDir, 'proj1'));
+            expect(projdir).toBe(proj1Dir);
             expect(projobj).toEqual({
                 data: 'data/',
             });
@@ -31,15 +51,29 @@ describe('Load Project ', ()=>{
 });
 
 describe('Render File', ()=>{
-    const projdir = path.join(path.join(testDir, 'proj1'));
+    // fs mock
+    const mnt = path.join(__dirname, 'mockfs');
+    beforeEach(()=>{
+        const mock = mockFs.fs({
+            '/proj1': {
+                'index.jade': 'p pow!',
+            },
+        });
+        fs.mount(mnt, mock);
+    });
+    afterEach(()=>{
+        fs.unmount(mnt);
+    });
     const ctx: RenderContext = {
-        projdir,
+        projdir: path.join(mnt, 'proj1'),
         data: {},
         options: {},
-        renderers: {},
+        renderers: {
+            // '.jade': require('jade').__express,
+        },
     };
     it('jade', done=>{
-        renderFileToString(ctx, path.join(projdir, 'index.jade')).then(html=>{
+        renderFileToString(ctx, path.join(ctx.projdir, 'index.jade')).then(html=>{
             expect(html).toBe('<p>pow!</p>');
             done();
         }).catch(done.fail);

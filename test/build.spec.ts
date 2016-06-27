@@ -4,22 +4,42 @@ import {
     build,
 } from '../lib/main';
 
-const pkgDir = require('pkg-dir');
 const fs = require('fs');
 const path = require('path');
 
 // test files.
-const testDir = path.join(pkgDir.sync(__dirname), 'test');
-const tmpDir = path.join(testDir, 'tmp');
+const mockFs = require('mock-fs');
+const mountfs = require('mountfs');
+
+mountfs.patchInPlace();
 
 describe('Build Project ', ()=>{
+    // fs mock
+    const mnt = path.join(__dirname, 'mockfs');
+    beforeEach(()=>{
+        const mock = mockFs.fs({
+            '/proj1': {
+                'myst.json': `{
+    "data": "data/"
+}`,
+                'index.jade': 'p pow!',
+            },
+            '/out': {},
+        });
+        fs.mount(mnt, mock);
+    });
+    afterEach(()=>{
+        fs.unmount(mnt);
+    });
     it('basic project', done=>{
+        const projDir = path.join(mnt, 'proj1');
+        const outDir = path.join(mnt, 'out');
         build({
-            cwd: path.join(testDir, 'proj1'),
-            outDir: path.join(tmpDir, 'proj1'),
+            cwd: projDir,
+            outDir,
         }).then(()=>{
             // check file
-            expect(fs.readFileSync(path.join(tmpDir, 'proj1', 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
             done();
         }).catch(done.fail);
     });
