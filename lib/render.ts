@@ -118,6 +118,8 @@ function getRenderer({options, renderers, projdir}: RenderContext, ext: string):
             return (renderers[ext] = localRequire('jade', projdir).__express);
         case '.ejs':
             return (renderers[ext] = localRequire('ejs', projdir).__express);
+        case '.dust':
+            return (renderers[ext] = makeDustjsRenderer(projdir));
         default:
             return null;
     }
@@ -139,4 +141,22 @@ function localRequire(name: string, projdir: string): any{
             return null;
         }
     }
+}
+
+
+// dustjsのrendererを作る
+function makeDustjsRenderer(projdir: string): ExpressFriendlyRenderFunction {
+    const dust = localRequire('dustjs-linkedin', projdir);
+    localRequire('dustjs-helpers', projdir);
+    return (path: string, options: any, callback: any)=>{
+        fs.readFile(path, (err, buf)=>{
+            if (err != null){
+                callback(err, null);
+                return;
+            }
+            const t = dust.compile(buf.toString(), path);
+            dust.loadSource(t);
+            dust.render(path, options, callback);
+        });
+    };
 }

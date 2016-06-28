@@ -58,6 +58,7 @@ describe('Render File', ()=>{
             '/proj1': {
                 'index.jade': 'p(data-foo=foo) pow!',
                 'foo.ejs': '<p>cow!<%= foo %></p>',
+                'bar.dust': '<p>wow! {foo}</p>',
             },
         });
         fs.mount(mnt, mock);
@@ -82,6 +83,12 @@ describe('Render File', ()=>{
     it('ejs', done=>{
         renderFileToString(ctx, path.join(ctx.projdir, 'foo.ejs')).then(html=>{
             expect(html).toBe('<p>cow!3</p>');
+            done();
+        }).catch(done.fail);
+    });
+    it('dustjs', done=>{
+        renderFileToString(ctx, path.join(ctx.projdir, 'bar.dust')).then(html=>{
+            expect(html).toBe('<p>wow! 3</p>');
             done();
         }).catch(done.fail);
     });
