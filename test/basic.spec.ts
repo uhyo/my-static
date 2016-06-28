@@ -56,7 +56,8 @@ describe('Render File', ()=>{
     beforeEach(()=>{
         const mock = mockFs.fs({
             '/proj1': {
-                'index.jade': 'p pow!',
+                'index.jade': 'p(data-foo=foo) pow!',
+                'foo.ejs': '<p>cow!<%= foo %></p>',
             },
         });
         fs.mount(mnt, mock);
@@ -66,15 +67,21 @@ describe('Render File', ()=>{
     });
     const ctx: RenderContext = {
         projdir: path.join(mnt, 'proj1'),
-        data: {},
-        options: {},
-        renderers: {
-            // '.jade': require('jade').__express,
+        data: {
+            foo: 3,
         },
+        options: {},
+        renderers: {},
     };
     it('jade', done=>{
         renderFileToString(ctx, path.join(ctx.projdir, 'index.jade')).then(html=>{
-            expect(html).toBe('<p>pow!</p>');
+            expect(html).toBe(`<p data-foo='3'>pow!</p>`);
+            done();
+        }).catch(done.fail);
+    });
+    it('ejs', done=>{
+        renderFileToString(ctx, path.join(ctx.projdir, 'foo.ejs')).then(html=>{
+            expect(html).toBe('<p>cow!3</p>');
             done();
         }).catch(done.fail);
     });

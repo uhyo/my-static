@@ -116,6 +116,8 @@ function getRenderer({options, renderers, projdir}: RenderContext, ext: string):
     switch (ext){
         case '.jade':
             return (renderers[ext] = localRequire('jade', projdir).__express);
+        case '.ejs':
+            return (renderers[ext] = localRequire('ejs', projdir).__express);
         default:
             return null;
     }
