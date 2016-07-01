@@ -48,6 +48,8 @@ foonum: 10`,
             // check file
             expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
             expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>吉野家にようこそ！</p>');
+            // extraneous file?
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
             done();
         }).catch(done.fail);
     });

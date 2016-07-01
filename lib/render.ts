@@ -56,6 +56,11 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
             }else{
                 // This is a file! 
                 resolve(renderFileToString(context, f).then(html=>new Promise((resolve, reject)=>{
+                    if (html == null){
+                        // これはrenderしないファイルだ
+                        resolve();
+                        return;
+                    }
                     // ファイルに保存
                     mkdirp(outDir, err=>{
                         if (err != null){
