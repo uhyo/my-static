@@ -52,23 +52,12 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
         settings.outDir = path.resolve(projdir, settings.outDir);
     }
     // data directory.
-    const renderers = {};
     if ('string' !== typeof settings.data){
-        return Promise.resolve({
-            projdir,
-            data: {},
-            settings,
-            renderers,
-        });
+        return Promise.resolve(new RenderContext(projdir, {}, settings));
     }
 
     const datadir = path.resolve(projdir, settings.data);
-    return loadData(datadir).then(data=>({
-        projdir,
-        data,
-        settings,
-        renderers,
-    }));
+    return loadData(datadir).then(data=>new RenderContext(projdir, data, settings));
 }
 
 // Build files.

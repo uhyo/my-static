@@ -13,6 +13,7 @@ const resolve = require('resolve');
 export interface ExpressFriendlyRenderFunction{
     (path: string, options: any, callback: any): void;
 }
+/*
 export interface RenderContext{
     projdir: string;
     data: any;
@@ -20,6 +21,76 @@ export interface RenderContext{
     renderers: {
         [ext: string]: ExpressFriendlyRenderFunction;
     };
+}
+*/
+export class RenderContext{
+    public projdir: string;
+    public data: any;
+    public settings: ProjectSettings;
+    private renderers: {
+        [ext: string]: ExpressFriendlyRenderFunction;
+    };
+    constructor(projdir: string, data: any, settings: ProjectSettings){
+        this.projdir = projdir;
+        this.data = data;
+        this.settings = settings;
+        this.renderers = {};
+    }
+    public getRenderer(ext: string): ExpressFriendlyRenderFunction {
+        const {
+            renderers,
+        } = this;
+        // from renderer cache
+        const f = renderers[ext];
+        if (f !=null){
+            return f;
+        }
+        // built-in renderers
+        switch (ext){
+            case '.jade':
+                return (renderers[ext] = this.localRequire('jade').__express);
+            case '.ejs':
+                return (renderers[ext] = this.localRequire('ejs').__express);
+            case '.dust':
+                return (renderers[ext] = makeDustjsRenderer(this));
+            default:
+                return null;
+        }
+
+        // dustjsのrendererを作る
+        function makeDustjsRenderer(ctx: RenderContext): ExpressFriendlyRenderFunction {
+            const dust = ctx.localRequire('dustjs-linkedin');
+            ctx.localRequire('dustjs-helpers');
+            return (path: string, options: any, callback: any)=>{
+                fs.readFile(path, (err, buf)=>{
+                    if (err != null){
+                        callback(err, null);
+                        return;
+                    }
+                    const t = dust.compile(buf.toString(), path);
+                    dust.loadSource(t);
+                    dust.render(path, options, callback);
+                });
+            };
+        }
+    }
+    // require modules from local project is possible
+    public localRequire(name: string): any{
+        try {
+            const lc = resolve.sync(name, {
+                basedir: this.projdir,
+            });
+            if (lc){
+                return require(lc);
+            }
+        }finally {
+            try {
+                return require(name);
+            }catch (e){
+                return null;
+            }
+        }
+    }
 }
 
 export function renderDirectory(context: RenderContext, dir: string, outDir: string): Promise<any>{
@@ -90,16 +161,16 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
 
 // fileをstringにrender
 // renderできないファイルはnullを返す
-export function renderFileToString(context: RenderContext, file: string): Promise<string>{
+export function renderFileToString(ctx: RenderContext, file: string): Promise<string>{
     return new Promise((resolve, reject)=>{
         const ext = path.extname(file);
-        const func = getRenderer(context, ext);
+        const func = ctx.getRenderer(ext);
         if (func == null){
             // funcがないなら何もしない
             resolve(null);
             return;
         }
-        func(file, context.data, (err, html)=>{
+        func(file, ctx.data, (err, html)=>{
             if (err != null){
                 reject(err);
             }else{
@@ -107,61 +178,4 @@ export function renderFileToString(context: RenderContext, file: string): Promis
             }
         });
     });
-}
-
-
-// renderer
-function getRenderer({settings, renderers, projdir}: RenderContext, ext: string): ExpressFriendlyRenderFunction{
-    // get cache
-    const f = renderers[ext];
-    if (f != null){
-        return f;
-    }
-    // built-in renderers
-    switch (ext){
-        case '.jade':
-            return (renderers[ext] = localRequire('jade', projdir).__express);
-        case '.ejs':
-            return (renderers[ext] = localRequire('ejs', projdir).__express);
-        case '.dust':
-            return (renderers[ext] = makeDustjsRenderer(projdir));
-        default:
-            return null;
-    }
-}
-
-// require modules from local is possible
-function localRequire(name: string, projdir: string): any{
-    try {
-        const lc = resolve.sync(name, {
-            basedir: projdir,
-        });
-        if (lc){
-            return require(lc);
-        }
-    }finally {
-        try {
-            return require(name);
-        }catch (e){
-            return null;
-        }
-    }
-}
-
-
-// dustjsのrendererを作る
-function makeDustjsRenderer(projdir: string): ExpressFriendlyRenderFunction {
-    const dust = localRequire('dustjs-linkedin', projdir);
-    localRequire('dustjs-helpers', projdir);
-    return (path: string, options: any, callback: any)=>{
-        fs.readFile(path, (err, buf)=>{
-            if (err != null){
-                callback(err, null);
-                return;
-            }
-            const t = dust.compile(buf.toString(), path);
-            dust.loadSource(t);
-            dust.render(path, options, callback);
-        });
-    };
 }

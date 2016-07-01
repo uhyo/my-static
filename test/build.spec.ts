@@ -98,5 +98,20 @@ foonum: 10`,
             done();
         }).catch(done.fail);
     });
+    it('override rootDir from option', done=>{
+        const projDir = path.join(mnt, 'proj2');
+        const outDir = path.join(mnt, 'out');
+        build({
+            cwd: path.join(projDir, 'contents'),
+            rootDir: path.join(mnt, 'proj1'),
+        }).then(()=>{
+            // extraneous file?
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+            // check file
+            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+            expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>すき家にようこそ！</p>');
+            done();
+        }).catch(done.fail);
+    });
 });
 

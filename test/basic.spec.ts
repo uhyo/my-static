@@ -92,19 +92,18 @@ describe('Render File', ()=>{
     afterEach(()=>{
         fs.unmount(mnt);
     });
-    const ctx: RenderContext = {
-        projdir: path.join(mnt, 'proj1'),
-        data: {
-            foo: 3,
-        },
-        settings: {
-            rootDir: null,
-            outDir: null,
-            outExt: null,
-            data: null,
-        },
-        renderers: {},
+    // prepare context
+    const projdir = path.join(mnt, 'proj1');
+    const data = {
+        foo: 3,
     };
+    const settings = {
+        rootDir: null,
+        outDir: null,
+        outExt: null,
+        data: null,
+    };
+    const ctx = new RenderContext(projdir, data, settings);
     it('jade', done=>{
         renderFileToString(ctx, path.join(ctx.projdir, 'index.jade')).then(html=>{
             expect(html).toBe(`<p data-foo='3'>pow!</p>`);
