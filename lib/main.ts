@@ -43,8 +43,13 @@ export function findProject(options: BuildOptions): Promise<FoundProject>{
 // read data.
 export function makeContext({projdir, options, settings}: FoundProject): Promise<RenderContext>{
     settings = overwriteSettings(options, settings);
-    if (!settings.rootDir){
+    if (settings.rootDir){
+        settings.rootDir = path.resolve(projdir, settings.rootDir);
+    }else{
         settings.rootDir = projdir;
+    }
+    if (settings.outDir){
+        settings.outDir = path.resolve(projdir, settings.outDir);
     }
     // data directory.
     const renderers = {};

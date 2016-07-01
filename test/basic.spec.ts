@@ -98,6 +98,7 @@ describe('Render File', ()=>{
             foo: 3,
         },
         settings: {
+            rootDir: null,
             outDir: null,
             outExt: null,
             data: null,

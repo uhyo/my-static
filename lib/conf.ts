@@ -40,7 +40,6 @@ export function overwriteSettings(options: BuildOptions, settings: ProjectSettin
     if (options.rootDir){
         settings.rootDir = options.rootDir;
     }
-
     if (options.outDir){
         settings.outDir = options.outDir;
     }

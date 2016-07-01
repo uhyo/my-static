@@ -31,6 +31,23 @@ foonum: 10`,
                 'index.jade': 'p pow!',
                 'foo.ejs': '<p><%= foo.foobar %>にようこそ！</p>',
             },
+            '/proj2': {
+                'myst.json': `{
+    "data": "${path.resolve(mnt, 'proj2', 'data')}",
+    "rootDir": "contents/",
+    "outDir": "../out"
+}`,
+                'data': {
+                    'foo.yaml': `
+foobar: すき家
+foonum: 10`,
+                    'bar.json': '{"welcome": "to my bar"}',
+                },
+                'contents': {
+                    'index.jade': 'p welcome #{bar.welcome}',
+                    'foo.ejs': '<p><%= foo.foobar %>に行きたい</p>',
+                },
+            },
             '/out': {},
         });
         fs.mount(mnt, mock);
@@ -50,6 +67,34 @@ foonum: 10`,
             expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>吉野家にようこそ！</p>');
             // extraneous file?
             expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+            done();
+        }).catch(done.fail);
+    });
+    it('specify rootDir, outDir', done=>{
+        const projDir = path.join(mnt, 'proj2');
+        const outDir = path.join(mnt, 'out');
+        build({
+            cwd: projDir,
+        }).then(()=>{
+            // extraneous file?
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+            // check file
+            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>welcome to my bar</p>');
+            expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>すき家に行きたい</p>');
+            done();
+        }).catch(done.fail);
+    });
+    it('from other cwd', done=>{
+        const projDir = path.join(mnt, 'proj2');
+        const outDir = path.join(mnt, 'out');
+        build({
+            cwd: path.join(projDir, 'contents'),
+        }).then(()=>{
+            // extraneous file?
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+            // check file
+            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>welcome to my bar</p>');
+            expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>すき家に行きたい</p>');
             done();
         }).catch(done.fail);
     });
