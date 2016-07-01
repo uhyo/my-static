@@ -9,6 +9,11 @@ import {
     renderFileToString,
 } from '../lib/render';
 
+import {
+    loadData,
+} from '../lib/load-data';
+
+
 const pkgDir = require('pkg-dir');
 const fs = require('fs');
 const path = require('path');
@@ -27,6 +32,12 @@ describe('Load Project ', ()=>{
                 'myst.json': `{
     "data": "data/"
 }`,
+                'data': {
+                    'foo.yaml': `
+foobar: 吉野家
+foonum: 10`,
+                    'bar.json': '{"welcome": "to my bar"}',
+                },
             },
         });
         fs.mount(mnt, mock);
@@ -35,7 +46,7 @@ describe('Load Project ', ()=>{
         fs.unmount(mnt);
     });
 
-    it('basic', done=>{
+    it('project file', done=>{
         const proj1Dir = path.join(mnt, 'proj1');
         findProject({
             cwd: proj1Dir,
@@ -44,6 +55,21 @@ describe('Load Project ', ()=>{
             expect(projdir).toBe(proj1Dir);
             expect(projobj).toEqual({
                 data: 'data/',
+            });
+            done();
+        }).catch(done.fail);
+    });
+    it('data directory', done=>{
+        const datadir = path.join(mnt, 'proj1', 'data');
+        loadData(datadir).then(obj=>{
+            expect(obj).toEqual({
+                foo: {
+                    foobar: '吉野家',
+                    foonum: 10,
+                },
+                bar: {
+                    welcome: 'to my bar',
+                },
             });
             done();
         }).catch(done.fail);

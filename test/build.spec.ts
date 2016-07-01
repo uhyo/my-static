@@ -22,7 +22,14 @@ describe('Build Project ', ()=>{
                 'myst.json': `{
     "data": "data/"
 }`,
+                'data': {
+                    'foo.yaml': `
+foobar: 吉野家
+foonum: 10`,
+                    'bar.json': '{"welcome": "to my bar"}',
+                },
                 'index.jade': 'p pow!',
+                'foo.ejs': '<p><%= foo.foobar %>にようこそ！</p>',
             },
             '/out': {},
         });
@@ -40,6 +47,7 @@ describe('Build Project ', ()=>{
         }).then(()=>{
             // check file
             expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+            expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>吉野家にようこそ！</p>');
             done();
         }).catch(done.fail);
     });

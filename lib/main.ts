@@ -3,11 +3,15 @@
 import {
     defaultOptions,
     BuildOptions,
+    ProjectSettings,
 } from './conf';
 import {
     RenderContext,
     renderDirectory,
 } from './render';
+import {
+    loadData,
+} from './load-data';
 const path = require('path');
 
 const findUp = require('find-up');
@@ -15,7 +19,7 @@ const mld = require('my-load-data');
 
 interface FoundProject{
     projdir: string;
-    projobj: any;
+    projobj: ProjectSettings;
     options: BuildOptions;
 }
 // Find project.
@@ -36,15 +40,34 @@ export function findProject(options: BuildOptions): Promise<FoundProject>{
         }));
     });
 }
+// read data.
+export function makeContext({projdir, projobj, options}: FoundProject): Promise<RenderContext>{
+    // data directory.
+    const renderers = {};
+    if ('string' !== typeof projobj.data){
+        return Promise.resolve({
+            projdir,
+            data: {},
+            options,
+            renderers,
+        });
+    }
+
+    const datadir = path.join(projdir, projobj.data);
+    return loadData(datadir).then(data=>({
+        projdir,
+        data,
+        options,
+        renderers,
+    }));
+}
 
 // Build files.
-export function render({projdir, projobj, options}: FoundProject): Promise<any>{
-    const context: RenderContext = {
+export function render(context: RenderContext): Promise<any>{
+    const {
         projdir,
-        data: {},
         options,
-        renderers: {},
-    };
+    } = context;
     const {outDir} = options;
     if (!outDir){
         return Promise.reject(new Error('outDir is not provided'));
@@ -57,5 +80,5 @@ export function build(options: BuildOptions = {}): Promise<any>{
     // Default options
     options = (Object as any).assign({}, defaultOptions, options);
 
-    return findProject(options).then(render);
+    return findProject(options).then(makeContext).then(render);
 }
