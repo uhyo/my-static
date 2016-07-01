@@ -51,9 +51,9 @@ foonum: 10`,
         findProject({
             cwd: proj1Dir,
             project: 'myst.json',
-        }).then(({projdir, projobj})=>{
+        }).then(({projdir, settings})=>{
             expect(projdir).toBe(proj1Dir);
-            expect(projobj).toEqual({
+            expect(settings).toEqual({
                 data: 'data/',
             });
             done();
@@ -97,7 +97,11 @@ describe('Render File', ()=>{
         data: {
             foo: 3,
         },
-        options: {},
+        settings: {
+            outDir: null,
+            outExt: null,
+            data: null,
+        },
         renderers: {},
     };
     it('jade', done=>{

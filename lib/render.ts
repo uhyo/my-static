@@ -2,7 +2,7 @@
 // render directory.
 //
 import {
-    BuildOptions,
+    ProjectSettings,
 } from './conf';
 
 const fs = require('fs');
@@ -16,7 +16,7 @@ export interface ExpressFriendlyRenderFunction{
 export interface RenderContext{
     projdir: string;
     data: any;
-    options: BuildOptions;
+    settings: ProjectSettings;
     renderers: {
         [ext: string]: ExpressFriendlyRenderFunction;
     };
@@ -62,7 +62,7 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
                             reject(err);
                         }else{
                             const {
-                                options: {
+                                settings: {
                                     outExt,
                                 },
                             } = context;
@@ -106,7 +106,7 @@ export function renderFileToString(context: RenderContext, file: string): Promis
 
 
 // renderer
-function getRenderer({options, renderers, projdir}: RenderContext, ext: string): ExpressFriendlyRenderFunction{
+function getRenderer({settings, renderers, projdir}: RenderContext, ext: string): ExpressFriendlyRenderFunction{
     // get cache
     const f = renderers[ext];
     if (f != null){
