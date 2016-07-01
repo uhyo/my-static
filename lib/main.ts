@@ -43,6 +43,9 @@ export function findProject(options: BuildOptions): Promise<FoundProject>{
 // read data.
 export function makeContext({projdir, options, settings}: FoundProject): Promise<RenderContext>{
     settings = overwriteSettings(options, settings);
+    if (!settings.rootDir){
+        settings.rootDir = projdir;
+    }
     // data directory.
     const renderers = {};
     if ('string' !== typeof settings.data){
@@ -54,7 +57,7 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
         });
     }
 
-    const datadir = path.join(projdir, settings.data);
+    const datadir = path.resolve(projdir, settings.data);
     return loadData(datadir).then(data=>({
         projdir,
         data,
@@ -69,11 +72,16 @@ export function render(context: RenderContext): Promise<any>{
         projdir,
         settings,
     } = context;
-    const {outDir} = settings;
+    const {
+        rootDir,
+        outDir,
+    } = settings;
     if (!outDir){
         return Promise.reject(new Error('outDir is not provided'));
     }
-    return renderDirectory(context, projdir, outDir);
+    // rootDirが相対パスかもしれないので
+    const r = path.resolve(projdir, rootDir);
+    return renderDirectory(context, r, outDir);
 }
 
 // Start building.

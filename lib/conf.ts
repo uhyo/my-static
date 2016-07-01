@@ -9,6 +9,8 @@ export interface BuildOptions{
     cwd?: string;
     // filename of myst.json
     project?: string;
+    // root directory of page files
+    rootDir?: string;
     // output directory
     outDir?: string;
     // extension of html files
@@ -17,6 +19,7 @@ export interface BuildOptions{
 
 // myst.jsonの中身
 export interface ProjectSettings{
+    rootDir: string;
     outDir: string;
     outExt: string;
     // dataディレクトリがある場所
@@ -34,6 +37,10 @@ export function defaultBuildOptions(options: BuildOptions): void{
 }
 // BuildOptionsはProjectSettingsを上書きするかも
 export function overwriteSettings(options: BuildOptions, settings: ProjectSettings): ProjectSettings{
+    if (options.rootDir){
+        settings.rootDir = options.rootDir;
+    }
+
     if (options.outDir){
         settings.outDir = options.outDir;
     }
