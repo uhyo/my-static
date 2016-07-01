@@ -6,7 +6,7 @@ import {
 
 import {
     RenderContext,
-    renderFileToString,
+    renderFile,
 } from '../lib/render';
 
 import {
@@ -79,6 +79,22 @@ foonum: 10`,
 describe('Render File', ()=>{
     // fs mock
     const mnt = path.join(__dirname, 'mockfs');
+
+    // prepare context
+    const projdir = path.join(mnt, 'proj1');
+    // outDir (fake)
+    const outDir = path.join(mnt, 'out');
+    const data = {
+        foo: 3,
+    };
+    const settings = {
+        rootDir: projdir,
+        outDir,
+        outExt: '.html',
+        data: null,
+    };
+    const ctx = new RenderContext(projdir, data, settings);
+
     beforeEach(()=>{
         const mock = mockFs.fs({
             '/proj1': {
@@ -88,37 +104,28 @@ describe('Render File', ()=>{
             },
         });
         fs.mount(mnt, mock);
+
+        // spy on ctx.saveFile
+        spyOn(ctx, 'saveFile').and.callFake(()=>Promise.resolve());
     });
     afterEach(()=>{
         fs.unmount(mnt);
     });
-    // prepare context
-    const projdir = path.join(mnt, 'proj1');
-    const data = {
-        foo: 3,
-    };
-    const settings = {
-        rootDir: null,
-        outDir: null,
-        outExt: null,
-        data: null,
-    };
-    const ctx = new RenderContext(projdir, data, settings);
     it('jade', done=>{
-        renderFileToString(ctx, path.join(ctx.projdir, 'index.jade')).then(html=>{
-            expect(html).toBe(`<p data-foo='3'>pow!</p>`);
+        renderFile(ctx, path.join(ctx.projdir, 'index.jade'), outDir).then(()=>{
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'index.html'), '<p data-foo=\'3\'>pow!</p>');
             done();
         }).catch(done.fail);
     });
     it('ejs', done=>{
-        renderFileToString(ctx, path.join(ctx.projdir, 'foo.ejs')).then(html=>{
-            expect(html).toBe('<p>cow!3</p>');
+        renderFile(ctx, path.join(ctx.projdir, 'foo.ejs'), outDir).then(html=>{
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'foo.html'), '<p>cow!3</p>');
             done();
         }).catch(done.fail);
     });
     it('dustjs', done=>{
-        renderFileToString(ctx, path.join(ctx.projdir, 'bar.dust')).then(html=>{
-            expect(html).toBe('<p>wow! 3</p>');
+        renderFile(ctx, path.join(ctx.projdir, 'bar.dust'), outDir).then(html=>{
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'bar.html'), '<p>wow! 3</p>');
             done();
         }).catch(done.fail);
     });

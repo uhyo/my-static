@@ -13,6 +13,9 @@ const resolve = require('resolve');
 export interface ExpressFriendlyRenderFunction{
     (path: string, options: any, callback: any): void;
 }
+export interface RenderFunction{
+    (path: string, outDir: string, options?: any): Promise<any>;
+}
 /*
 export interface RenderContext{
     projdir: string;
@@ -28,7 +31,7 @@ export class RenderContext{
     public data: any;
     public settings: ProjectSettings;
     private renderers: {
-        [ext: string]: ExpressFriendlyRenderFunction;
+        [ext: string]: RenderFunction;
     };
     constructor(projdir: string, data: any, settings: ProjectSettings){
         this.projdir = projdir;
@@ -36,7 +39,8 @@ export class RenderContext{
         this.settings = settings;
         this.renderers = {};
     }
-    public getRenderer(ext: string): ExpressFriendlyRenderFunction {
+    // 拡張子に対応するrendererを読み込む
+    public getRenderer(ext: string): RenderFunction {
         const {
             renderers,
         } = this;
@@ -48,31 +52,15 @@ export class RenderContext{
         // built-in renderers
         switch (ext){
             case '.jade':
-                return (renderers[ext] = this.localRequire('jade').__express);
+                return (renderers[ext] = renderUtil.makeExpressRenderer(this, this.localRequire('jade').__express));
             case '.ejs':
-                return (renderers[ext] = this.localRequire('ejs').__express);
+                return (renderers[ext] = renderUtil.makeExpressRenderer(this, this.localRequire('ejs').__express));
             case '.dust':
-                return (renderers[ext] = makeDustjsRenderer(this));
+                return (renderers[ext] = renderUtil.makeDustjsRenderer(this));
             default:
                 return null;
         }
 
-        // dustjsのrendererを作る
-        function makeDustjsRenderer(ctx: RenderContext): ExpressFriendlyRenderFunction {
-            const dust = ctx.localRequire('dustjs-linkedin');
-            ctx.localRequire('dustjs-helpers');
-            return (path: string, options: any, callback: any)=>{
-                fs.readFile(path, (err, buf)=>{
-                    if (err != null){
-                        callback(err, null);
-                        return;
-                    }
-                    const t = dust.compile(buf.toString(), path);
-                    dust.loadSource(t);
-                    dust.render(path, options, callback);
-                });
-            };
-        }
     }
     // require modules from local project is possible
     public localRequire(name: string): any{
@@ -90,6 +78,36 @@ export class RenderContext{
                 return null;
             }
         }
+    }
+    // ファイルにかきこみ
+    public saveFile(file: string, content: string): Promise<any>{
+        return new Promise((resolve, reject)=>{
+            fs.writeFile(file, content, err=>{
+                if (err != null){
+                    reject(err);
+                    return;
+                }
+                resolve();
+            });
+        });
+    }
+    // このファイルを更新すべきか
+    public isRerenderRequired(file: string): Promise<boolean>{
+        return new Promise((resolve, reject)=>{
+            fs.stat(file, (err, st)=>{
+                if (err != null){
+                    if (err.code === 'ENOENT'){
+                        // ファイルがないので書くべき
+                        resolve(true);
+                    }else{
+                        reject(err);
+                    }
+                    return;
+                }
+                // ファイルの更新日時をチェック
+                const m = st.mtime.getTime();
+            });
+        });
     }
 }
 
@@ -126,56 +144,74 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
                 resolve(renderDirectory(context, f, path.join(outDir, path.basename(f))));
             }else{
                 // This is a file! 
-                resolve(renderFileToString(context, f).then(html=>new Promise((resolve, reject)=>{
-                    if (html == null){
-                        // これはrenderしないファイルだ
-                        resolve();
-                        return;
-                    }
-                    // ファイルに保存
-                    mkdirp(outDir, err=>{
-                        if (err != null){
-                            reject(err);
-                        }else{
-                            const {
-                                settings: {
-                                    outExt,
-                                },
-                            } = context;
-                            const ext = path.extname(f);
-                            const targetFile = path.join(outDir, path.basename(f, ext) + outExt);
-                            fs.writeFile(targetFile, html, err=>{
-                                if (err != null){
-                                    reject(err);
-                                }else{
-                                    resolve();
-                                }
-                            });
-                        }
-                    });
-                })).catch(reject));
+                /* TODO: ext? */
+                const ext = path.extname(f);
+                const r = context.getRenderer(ext);
+                if (r == null){
+                    // 対応するRendererがない
+                    resolve();
+                    return;
+                }
+                resolve(r(f, outDir, context.data));
             }
         });
     });
 }
 
-// fileをstringにrender
-// renderできないファイルはnullを返す
-export function renderFileToString(ctx: RenderContext, file: string): Promise<string>{
-    return new Promise((resolve, reject)=>{
-        const ext = path.extname(file);
-        const func = ctx.getRenderer(ext);
-        if (func == null){
-            // funcがないなら何もしない
-            resolve(null);
-            return;
-        }
-        func(file, ctx.data, (err, html)=>{
-            if (err != null){
-                reject(err);
-            }else{
-                resolve(html);
-            }
+// renderers
+namespace renderUtil{
+    // expressのあれに対応したrendererを作る
+    export function makeExpressRenderer(ctx: RenderContext, func: ExpressFriendlyRenderFunction): RenderFunction{
+        return (path: string, outDir: string, options?: any)=> new Promise((resolve, reject)=>{
+            func(path, options, (err, html)=>{
+                if (err != null){
+                    reject(err);
+                    return;
+                }
+                resolve(HTMLSaveAction(ctx, path, outDir, html));
+            });
         });
-    });
+    }
+    // dustjsのrendererを作る
+    export function makeDustjsRenderer(ctx: RenderContext): RenderFunction {
+        const dust = ctx.localRequire('dustjs-linkedin');
+        ctx.localRequire('dustjs-helpers');
+        return (path: string, outDir: string, options?: any)=>{
+            return new Promise((resolve, reject)=>{
+                fs.readFile(path, (err, buf)=>{
+                    if (err != null){
+                        reject(err);
+                        return;
+                    }
+                    const t = dust.compile(buf.toString(), path);
+                    dust.loadSource(t);
+                    dust.render(path, options, (err, html)=>{
+                        if (err != null){
+                            reject(err);
+                            return;
+                        }
+                        resolve(HTMLSaveAction(ctx, path, outDir, html));
+                    });
+                });
+            });
+        };
+    }
+
+    // ただファイルに保存
+    // path: もとのファイル名
+    function HTMLSaveAction(ctx: RenderContext, file: string, outDir: string, html: string): Promise<any>{
+        const ext = path.extname(file);
+        const base = path.basename(file, ext);
+        // 拡張子を変える
+        const saveFile = path.join(outDir, base + ctx.settings.outExt);
+        return new Promise((resolve, reject)=>{
+            mkdirp(outDir, err=>{
+                if (err != null){
+                    reject(err);
+                }else{
+                    resolve(ctx.saveFile(saveFile, html));
+                }
+            });
+        });
+    }
 }
