@@ -40,10 +40,11 @@ export class RenderContext{
         this.renderers = {};
     }
     // 拡張子に対応するrendererを読み込む
-    public getRenderer(ext: string): RenderFunction {
+    public getRenderer(filepath: string): RenderFunction {
         const {
             renderers,
         } = this;
+        const ext = path.extname(filepath);
         // from renderer cache
         const f = renderers[ext];
         if (f !=null){
@@ -51,12 +52,20 @@ export class RenderContext{
         }
         // built-in renderers
         switch (ext){
+            // Template Engines
             case '.jade':
                 return (renderers[ext] = renderUtil.makeExpressRenderer(this, this.localRequire('jade').__express));
             case '.ejs':
                 return (renderers[ext] = renderUtil.makeExpressRenderer(this, this.localRequire('ejs').__express));
             case '.dust':
                 return (renderers[ext] = renderUtil.makeDustjsRenderer(this));
+
+            // Static Files
+            case '.html':
+            case '.htm':
+            case '.css':
+            case '.js':
+                return (renderers[ext] = renderUtil.makeStaticRenderer(this));
             default:
                 return null;
         }
@@ -144,9 +153,7 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
                 resolve(renderDirectory(context, f, path.join(outDir, path.basename(f))));
             }else{
                 // This is a file! 
-                /* TODO: ext? */
-                const ext = path.extname(f);
-                const r = context.getRenderer(ext);
+                const r = context.getRenderer(f);
                 if (r == null){
                     // 対応するRendererがない
                     resolve();
@@ -191,6 +198,29 @@ namespace renderUtil{
                             return;
                         }
                         resolve(HTMLSaveAction(ctx, path, outDir, html));
+                    });
+                });
+            });
+        };
+    }
+    // 静的ファイルのrendererを作る
+    export function makeStaticRenderer(ctx: RenderContext): RenderFunction {
+        return (file: string, outDir: string)=>{
+            return new Promise((resolve, reject)=>{
+                const base = path.basename(file);
+                const target = path.join(outDir, base);
+
+                fs.readFile(file, (err, buf)=>{
+                    if (err != null){
+                        reject(err);
+                        return;
+                    }
+                    mkdirp(outDir, err=>{
+                        if (err != null){
+                            reject(err);
+                            return;
+                        }
+                        resolve(ctx.saveFile(target, buf.toString()));
                     });
                 });
             });

@@ -101,6 +101,9 @@ describe('Render File', ()=>{
                 'index.jade': 'p(data-foo=foo) pow!',
                 'foo.ejs': '<p>cow!<%= foo %></p>',
                 'bar.dust': '<p>wow! {foo}</p>',
+                '吉野家.html': '<table><tr><td>row!</td></tr></table>',
+                'a.js': 'alert(1);',
+                'a.css': 'body {color: red;}',
             },
         });
         fs.mount(mnt, mock);
@@ -126,6 +129,24 @@ describe('Render File', ()=>{
     it('dustjs', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'bar.dust'), outDir).then(html=>{
             expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'bar.html'), '<p>wow! 3</p>');
+            done();
+        }).catch(done.fail);
+    });
+    it('html', done=>{
+        renderFile(ctx, path.join(ctx.projdir, '吉野家.html'), outDir).then(html=>{
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, '吉野家.html'), '<table><tr><td>row!</td></tr></table>');
+            done();
+        }).catch(done.fail);
+    });
+    it('js', done=>{
+        renderFile(ctx, path.join(ctx.projdir, 'a.js'), outDir).then(html=>{
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.js'), 'alert(1);');
+            done();
+        }).catch(done.fail);
+    });
+    it('css', done=>{
+        renderFile(ctx, path.join(ctx.projdir, 'a.css'), outDir).then(html=>{
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.css'), 'body {color: red;}');
             done();
         }).catch(done.fail);
     });
