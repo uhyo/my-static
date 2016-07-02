@@ -89,33 +89,41 @@ export class RenderContext{
         }
     }
     // ファイルにかきこみ
-    public saveFile(file: string, content: string): Promise<any>{
+    public saveFile(file: string, content: string, mtime?: number): Promise<any>{
         return new Promise((resolve, reject)=>{
-            fs.writeFile(file, content, err=>{
-                if (err != null){
-                    reject(err);
-                    return;
-                }
-                resolve();
-            });
-        });
-    }
-    // このファイルを更新すべきか
-    public isRerenderRequired(file: string): Promise<boolean>{
-        return new Promise((resolve, reject)=>{
-            fs.stat(file, (err, st)=>{
-                if (err != null){
-                    if (err.code === 'ENOENT'){
-                        // ファイルがないので書くべき
-                        resolve(true);
-                    }else{
+            const wr = ()=>{
+                fs.writeFile(file, content, err=>{
+                    if (err != null){
                         reject(err);
+                        return;
                     }
-                    return;
-                }
-                // ファイルの更新日時をチェック
-                const m = st.mtime.getTime();
-            });
+                    resolve();
+                });
+            };
+            if (mtime == null){
+                wr();
+            }else{
+                fs.stat(file, (err, st)=>{
+                    if (err != null){
+                        if (err.code === 'ENOENT'){
+                            // ファイルがないので書くべき
+                            wr();
+                        }else{
+                            reject(err);
+                        }
+                        return;
+                    }
+                    // ファイルの更新日時をチェック
+                    const m = st.mtime.getTime();
+                    if (m < mtime){
+                        // より新しいデータが来たので書き換える
+                        wr();
+                    }else{
+                        // 何もせずに
+                        resolve();
+                    }
+                });
+            }
         });
     }
 }
@@ -170,12 +178,20 @@ namespace renderUtil{
     // expressのあれに対応したrendererを作る
     export function makeExpressRenderer(ctx: RenderContext, func: ExpressFriendlyRenderFunction): RenderFunction{
         return (path: string, outDir: string, options?: any)=> new Promise((resolve, reject)=>{
-            func(path, options, (err, html)=>{
+            // ファイルの更新日時チェック
+            fs.stat(path, (err, st)=>{
                 if (err != null){
                     reject(err);
                     return;
                 }
-                resolve(HTMLSaveAction(ctx, path, outDir, html));
+                const mtime = st.mtime.getTime();
+                func(path, options, (err, html)=>{
+                    if (err != null){
+                        reject(err);
+                        return;
+                    }
+                    resolve(HTMLSaveAction(ctx, path, outDir, html, mtime));
+                });
             });
         });
     }
@@ -190,14 +206,20 @@ namespace renderUtil{
                         reject(err);
                         return;
                     }
-                    const t = dust.compile(buf.toString(), path);
-                    dust.loadSource(t);
-                    dust.render(path, options, (err, html)=>{
+                    fs.stat(path, (err, st)=>{
                         if (err != null){
                             reject(err);
                             return;
                         }
-                        resolve(HTMLSaveAction(ctx, path, outDir, html));
+                        const t = dust.compile(buf.toString(), path);
+                        dust.loadSource(t);
+                        dust.render(path, options, (err, html)=>{
+                            if (err != null){
+                                reject(err);
+                                return;
+                            }
+                            resolve(HTMLSaveAction(ctx, path, outDir, html, st.mtime.getTime()));
+                        });
                     });
                 });
             });
@@ -210,17 +232,23 @@ namespace renderUtil{
                 const base = path.basename(file);
                 const target = path.join(outDir, base);
 
-                fs.readFile(file, (err, buf)=>{
+                fs.stat(file, (err, st)=>{
                     if (err != null){
                         reject(err);
                         return;
                     }
-                    mkdirp(outDir, err=>{
+                    fs.readFile(file, (err, buf)=>{
                         if (err != null){
                             reject(err);
                             return;
                         }
-                        resolve(ctx.saveFile(target, buf.toString()));
+                        mkdirp(outDir, err=>{
+                            if (err != null){
+                                reject(err);
+                                return;
+                            }
+                            resolve(ctx.saveFile(target, buf.toString(), st.mtime.getTime()));
+                        });
                     });
                 });
             });
@@ -229,7 +257,7 @@ namespace renderUtil{
 
     // ただファイルに保存
     // path: もとのファイル名
-    function HTMLSaveAction(ctx: RenderContext, file: string, outDir: string, html: string): Promise<any>{
+    function HTMLSaveAction(ctx: RenderContext, file: string, outDir: string, html: string, mtime: number): Promise<any>{
         const ext = path.extname(file);
         const base = path.basename(file, ext);
         // 拡張子を変える
@@ -239,7 +267,7 @@ namespace renderUtil{
                 if (err != null){
                     reject(err);
                 }else{
-                    resolve(ctx.saveFile(saveFile, html));
+                    resolve(ctx.saveFile(saveFile, html, mtime));
                 }
             });
         });

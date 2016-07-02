@@ -94,16 +94,36 @@ describe('Render File', ()=>{
         data: null,
     };
     const ctx = new RenderContext(projdir, data, settings);
+    const mtime = new Date();
+    const tim = mtime.getTime();
 
     beforeEach(()=>{
         const mock = mockFs.fs({
             '/proj1': {
-                'index.jade': 'p(data-foo=foo) pow!',
-                'foo.ejs': '<p>cow!<%= foo %></p>',
-                'bar.dust': '<p>wow! {foo}</p>',
-                '吉野家.html': '<table><tr><td>row!</td></tr></table>',
-                'a.js': 'alert(1);',
-                'a.css': 'body {color: red;}',
+                'index.jade': mockFs.file({
+                    content: 'p(data-foo=foo) pow!',
+                    mtime,
+                }),
+                'foo.ejs': mockFs.file({
+                    content: '<p>cow!<%= foo %></p>',
+                    mtime,
+                }),
+                'bar.dust': mockFs.file({
+                    content: '<p>wow! {foo}</p>',
+                    mtime,
+                }),
+                '吉野家.html': mockFs.file({
+                    content: '<table><tr><td>row!</td></tr></table>',
+                    mtime,
+                }),
+                'a.js': mockFs.file({
+                    content: 'alert(1);',
+                    mtime,
+                }),
+                'a.css': mockFs.file({
+                    content: 'body {color: red;}',
+                    mtime,
+                }),
             },
         });
         fs.mount(mnt, mock);
@@ -116,37 +136,37 @@ describe('Render File', ()=>{
     });
     it('jade', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'index.jade'), outDir).then(()=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'index.html'), '<p data-foo=\'3\'>pow!</p>');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'index.html'), '<p data-foo=\'3\'>pow!</p>', tim);
             done();
         }).catch(done.fail);
     });
     it('ejs', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'foo.ejs'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'foo.html'), '<p>cow!3</p>');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'foo.html'), '<p>cow!3</p>', tim);
             done();
         }).catch(done.fail);
     });
     it('dustjs', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'bar.dust'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'bar.html'), '<p>wow! 3</p>');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'bar.html'), '<p>wow! 3</p>', tim);
             done();
         }).catch(done.fail);
     });
     it('html', done=>{
         renderFile(ctx, path.join(ctx.projdir, '吉野家.html'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, '吉野家.html'), '<table><tr><td>row!</td></tr></table>');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, '吉野家.html'), '<table><tr><td>row!</td></tr></table>', tim);
             done();
         }).catch(done.fail);
     });
     it('js', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'a.js'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.js'), 'alert(1);');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.js'), 'alert(1);', tim);
             done();
         }).catch(done.fail);
     });
     it('css', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'a.css'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.css'), 'body {color: red;}');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.css'), 'body {color: red;}', tim);
             done();
         }).catch(done.fail);
     });
