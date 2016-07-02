@@ -16,6 +16,8 @@ mountfs.patchInPlace();
 describe('Build Project ', ()=>{
     // fs mock
     const mnt = path.join(__dirname, 'mockfs');
+    const mtime = new Date();
+    const tim = mtime.getTime();
     beforeEach(()=>{
         const mock = mockFs.fs({
             '/proj1': {
@@ -48,7 +50,27 @@ foonum: 10`,
                     'foo.ejs': '<p><%= foo.foobar %>に行きたい</p>',
                 },
             },
-            '/out': {},
+            '/proj3': {
+                'myst.json': `{
+    "outDir": "../out-proj3"
+}`,
+                'index.jade': mockFs.file({
+                    content: 'p pow!',
+                    mtime,
+                }),
+                'foo.dust': mockFs.file({
+                    content: '<p>ぬ\u3099',
+                    mtime,
+                }),
+            },
+            '/out': {
+            },
+            '/out-proj3': {
+                'foo.html': mockFs.file({
+                    content: 'I AM FOO',
+                    mtime: new Date(tim + 3600000),
+                }),
+            },
         });
         fs.mount(mnt, mock);
     });
@@ -110,6 +132,18 @@ foonum: 10`,
             // check file
             expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
             expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>すき家にようこそ！</p>');
+            done();
+        }).catch(done.fail);
+    });
+    it('check mtime to save', done=>{
+        const projDir = path.join(mnt, 'proj3');
+        const outDir = path.join(mnt, 'out-proj3');
+        build({
+            cwd: projDir,
+        }).then(()=>{
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+            expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('I AM FOO');
             done();
         }).catch(done.fail);
     });
