@@ -157,7 +157,7 @@ block content
                     }),
                     'foo.jade': mockFs.file({
                         content: `p this file is old!`,
-                        mtime:new Date(tim - 7200000),
+                        mtime: new Date(tim - 7200000),
                     }),
                 },
             },
