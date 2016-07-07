@@ -24,6 +24,8 @@ export interface ProjectSettings{
     outExt: string;
     // dataディレクトリがある場所
     data: string;
+    // cacheファイルの場所
+    cache: string;
 }
 
 // BuildOptionsにデフォルト設定を書き込む

@@ -97,6 +97,7 @@ describe('Render File', ()=>{
         outDir,
         outExt: '.html',
         data: null,
+        cache: null,
     };
     const ctx = new RenderContext(projdir, data, settings);
     const mtime = new Date();

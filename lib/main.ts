@@ -55,9 +55,12 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
     if ('string' !== typeof settings.data){
         return Promise.resolve(new RenderContext(projdir, {}, settings));
     }
+    // cache?
+    const {cache} = settings;
+    const cachedir = 'string' === typeof cache ? path.resolve(projdir, cache) : null;
 
     const datadir = path.resolve(projdir, settings.data);
-    return loadData(datadir).then(data=>new RenderContext(projdir, data, settings));
+    return loadData(datadir, cachedir).then(data=>new RenderContext(projdir, data, settings));
 }
 
 // Build files.

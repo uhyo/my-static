@@ -24,11 +24,49 @@ describe('Build Project', ()=>{
                 'myst.json': `{
     "data": "data/"
 }`,
+                'myst-cache.json': `{
+    "data": "data/",
+    "outDir": "../out",
+    "cache": ".myst.cache.json"
+}`,
+                '.myst.cache.json': JSON.stringify({
+                    foo: {
+                        foobar: '私の家',
+                        $mtime: tim+7200000,
+                    },
+                    bar: {
+                        welcome: 'to my house',
+                        $mtime: tim,
+                    },
+                    $mtime: tim+7200000,
+                }),
+                'myst-cache2.json': `{
+    "data": "data/",
+    "outDir": "../out",
+    "cache": ".myst.cache2.json"
+}`,
+                '.myst.cache2.json': JSON.stringify({
+                    foo: {
+                        foobar: '日本',
+                        $mtime: tim-3600000,
+                    },
+                    bar: {
+                        welcome: 'to Japan',
+                        $mtime: tim-3600000,
+                    },
+                    $mtime: tim-3600000,
+                }),
                 'data': {
-                    'foo.yaml': `
+                    'foo.yaml': mockFs.file({
+                        content: `
 foobar: 吉野家
 foonum: 10`,
-                    'bar.json': '{"welcome": "to my bar"}',
+                        mtime,
+                    }),
+                    'bar.json': mockFs.file({
+                        content: '{"welcome": "to my bar"}',
+                        mtime,
+                    }),
                 },
                 'index.jade': 'p pow!',
                 'foo.ejs': '<p><%= foo.foobar %>にようこそ！</p>',
@@ -179,6 +217,49 @@ foonum: 10`,
             expect(fs.readFileSync(path.join(outDir, 'a.js'), 'utf8')).toBe('while(1){}');
             done();
         }).catch(done.fail);
+    });
+    describe('caches', ()=>{
+        it('use cache', done=>{
+            const projDir = path.join(mnt, 'proj1');
+            const outDir = path.join(mnt, 'out');
+            build({
+                cwd: projDir,
+                project: 'myst-cache.json',
+            }).then(()=>{
+                expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+                expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+                // cache is used
+                expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>私の家にようこそ！</p>');
+                done();
+            }).catch(done.fail);
+        });
+        it('write cache', done=>{
+            const projDir = path.join(mnt, 'proj1');
+            const outDir = path.join(mnt, 'out');
+            build({
+                cwd: projDir,
+                project: 'myst-cache2.json',
+            }).then(()=>{
+                expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+                expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+                // cache is not used
+                expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>吉野家にようこそ！</p>');
+                // write back cache
+                expect(JSON.parse(fs.readFileSync(path.join(projDir, '.myst.cache2.json'), 'utf8'))).toEqual({
+                    foo: {
+                        foobar: '吉野家',
+                        foonum: 10,
+                        $mtime: tim,
+                    },
+                    bar: {
+                        welcome: 'to my bar',
+                        $mtime: tim,
+                    },
+                    $mtime: tim,
+                });
+                done();
+            }).catch(done.fail);
+        });
     });
 });
 
