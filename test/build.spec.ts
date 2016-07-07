@@ -115,6 +115,52 @@ foonum: 10`,
                     mtime,
                 }),
             },
+            '/proj4': {
+                'myst.json': `{
+    "data": "./data/",
+    "outDir": "../out-proj4",
+    "rootDir": "./contents",
+    "dependency": "./layout"
+}`,
+                'myst2.json': `{
+    "data": "./data/",
+    "outDir": "../out-proj4",
+    "rootDir": "./contents",
+    "dependency": ["./layout", "dummy"]
+}`,
+                'data': {
+                    'foo.json': mockFs.file({
+                        content: '{"foo":"bar"}',
+                        mtime: new Date(tim - 7200000),
+                    }),
+                },
+                'layout': {
+                    'main.jade': mockFs.file({
+                        content: `div
+  block content
+`,
+                        mtime: new Date(tim + 100000),
+                    }),
+                },
+                'dummy': {
+                    'very_new_file.txt': mockFs.file({
+                        content: 'pow!',
+                        mtime: new Date(tim + 10000000),
+                    }),
+                },
+                'contents': {
+                    'index.jade': mockFs.file({
+                        content: `extends ../layout/main.jade
+block content
+  p this is from fs!`,
+                        mtime: new Date(tim - 3600000),
+                    }),
+                    'foo.jade': mockFs.file({
+                        content: `p this file is old!`,
+                        mtime:new Date(tim - 7200000),
+                    }),
+                },
+            },
             '/out': {
             },
             '/out-proj3': {
@@ -125,6 +171,16 @@ foonum: 10`,
                 'a.js': mockFs.file({
                     content: 'alert(0)',
                     mtime: new Date(tim - 3600000),
+                }),
+            },
+            '/out-proj4': {
+                'index.html': mockFs.file({
+                    content: '<p>this file is unchanged</p>',
+                    mtime,
+                }),
+                'foo.html': mockFs.file({
+                    content: '<p>this file is brand new</p>',
+                    mtime: new Date(tim + 200000),
                 }),
             },
         });
@@ -191,32 +247,34 @@ foonum: 10`,
             done();
         }).catch(done.fail);
     });
-    it('check mtime to save', done=>{
-        const projDir = path.join(mnt, 'proj3');
-        const outDir = path.join(mnt, 'out-proj3');
-        build({
-            cwd: projDir,
-        }).then(()=>{
-            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html', 'a.js'].sort());
-            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
-            expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('I AM FOO');
-            expect(fs.readFileSync(path.join(outDir, 'a.js'), 'utf8')).toBe('while(1){}');
-            done();
-        }).catch(done.fail);
-    });
-    it('check mtime of data', done=>{
-        const projDir = path.join(mnt, 'proj3');
-        const outDir = path.join(mnt, 'out-proj3');
-        build({
-            cwd: projDir,
-            project: 'myst2.json',
-        }).then(()=>{
-            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html', 'a.js'].sort());
-            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
-            expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>ぬ\u3099</p>');
-            expect(fs.readFileSync(path.join(outDir, 'a.js'), 'utf8')).toBe('while(1){}');
-            done();
-        }).catch(done.fail);
+    describe('mtime', ()=>{
+        it('check mtime to save', done=>{
+            const projDir = path.join(mnt, 'proj3');
+            const outDir = path.join(mnt, 'out-proj3');
+            build({
+                cwd: projDir,
+            }).then(()=>{
+                expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html', 'a.js'].sort());
+                expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+                expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('I AM FOO');
+                expect(fs.readFileSync(path.join(outDir, 'a.js'), 'utf8')).toBe('while(1){}');
+                done();
+            }).catch(done.fail);
+        });
+        it('check mtime of data', done=>{
+            const projDir = path.join(mnt, 'proj3');
+            const outDir = path.join(mnt, 'out-proj3');
+            build({
+                cwd: projDir,
+                project: 'myst2.json',
+            }).then(()=>{
+                expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html', 'a.js'].sort());
+                expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+                expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>ぬ\u3099</p>');
+                expect(fs.readFileSync(path.join(outDir, 'a.js'), 'utf8')).toBe('while(1){}');
+                done();
+            }).catch(done.fail);
+        });
     });
     describe('caches', ()=>{
         it('use cache', done=>{
@@ -257,6 +315,33 @@ foonum: 10`,
                     },
                     $mtime: tim,
                 });
+                done();
+            }).catch(done.fail);
+        });
+    });
+    describe('dependency', ()=>{
+        it('see dependency', done=>{
+            const projDir = path.join(mnt, 'proj4');
+            const outDir = path.join(mnt, 'out-proj4');
+            build({
+                cwd: projDir,
+            }).then(()=>{
+                expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+                expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe(`<div><p>this is from fs!</p></div>`);
+                expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe(`<p>this file is brand new</p>`);
+                done();
+            }).catch(done.fail);
+        });
+        it('see dependencies', done=>{
+            const projDir = path.join(mnt, 'proj4');
+            const outDir = path.join(mnt, 'out-proj4');
+            build({
+                cwd: projDir,
+                project: 'myst2.json',
+            }).then(()=>{
+                expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+                expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe(`<div><p>this is from fs!</p></div>`);
+                expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe(`<p>this file is old!</p>`);
                 done();
             }).catch(done.fail);
         });

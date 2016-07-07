@@ -26,6 +26,8 @@ export interface ProjectSettings{
     data: string;
     // cacheファイルの場所
     cache: string;
+    // 依存ファイルの一覧
+    dependency: string | Array<string>;
 }
 
 // BuildOptionsにデフォルト設定を書き込む

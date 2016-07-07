@@ -33,13 +33,13 @@ export class RenderContext{
     private renderers: {
         [ext: string]: RenderFunction;
     };
-    private datamtime: number;
-    constructor(projdir: string, data: any, settings: ProjectSettings){
+    private basemtime: number;
+    constructor(projdir: string, data: any, basemtime: number, settings: ProjectSettings){
         this.projdir = projdir;
         this.data = data;
         this.settings = settings;
         this.renderers = {};
-        this.datamtime = data ? data['$mtime'] || null : null;
+        this.basemtime = basemtime;
     }
     // 拡張子に対応するrendererを読み込む
     public getRenderer(filepath: string): RenderFunction {
@@ -117,7 +117,7 @@ export class RenderContext{
                     }
                     // ファイルの更新日時をチェック
                     const m = st.mtime.getTime();
-                    if (m < mtime || (this.datamtime != null && m < this.datamtime)){
+                    if (m < mtime || (this.basemtime != null && m < this.basemtime)){
                         // より新しいデータが来たので書き換える
                         wr();
                     }else{

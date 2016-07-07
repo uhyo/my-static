@@ -12,6 +12,7 @@ import {
 } from './render';
 import {
     loadData,
+    getMTime,
 } from './load-data';
 const path = require('path');
 
@@ -53,14 +54,24 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
     }
     // data directory.
     if ('string' !== typeof settings.data){
-        return Promise.resolve(new RenderContext(projdir, {}, settings));
+        return Promise.resolve(new RenderContext(projdir, {}, null, settings));
     }
     // cache?
-    const {cache} = settings;
+    const {
+        cache,
+        dependency,
+    } = settings;
     const cachedir = 'string' === typeof cache ? path.resolve(projdir, cache) : null;
 
     const datadir = path.resolve(projdir, settings.data);
-    return loadData(datadir, cachedir).then(data=>new RenderContext(projdir, data, settings));
+    const dependency_a = Array.isArray(dependency) ? dependency : dependency ? [dependency] : [];
+    const dependency_aa = dependency_a.map(p=>path.resolve(projdir, p));
+    return Promise.all([getMTime(dependency_aa), loadData(datadir, cachedir)]).then(([mtime, data])=>{
+        // dataの最終更新時間
+        const datamtime = data ? data['$mtime'] || null : null;
+        const basemtime = Math.max(mtime, datamtime);
+        return new RenderContext(projdir, data, basemtime, settings);
+    });
 }
 
 // Build files.

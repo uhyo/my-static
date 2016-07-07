@@ -32,3 +32,27 @@ export function loadData(datadir: string, cachefile?: string): Promise<any>{
         }
     });
 }
+
+// mtime of file / directory.
+export function getMTime(files: Array<string>): Promise<number>{
+    return Promise.all(files.map(file=>new Promise((resolve, reject)=>{
+        fs.stat(file, (err, st)=>{
+            if (err != null){
+                reject(err);
+                return;
+            }
+            if (st.isDirectory()){
+                fs.readdir(file, (err, files)=>{
+                    if (err != null){
+                        reject(err);
+                        return;
+                    }
+                    resolve(getMTime(files.map(f=>path.join(file, f))));
+                });
+            }else{
+                resolve(st.mtime.getTime());
+            }
+        });
+    }))).then((mtimes: Array<number>)=>Math.max(...mtimes));
+
+}
