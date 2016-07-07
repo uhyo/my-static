@@ -13,7 +13,7 @@ const mountfs = require('mountfs');
 
 mountfs.patchInPlace();
 
-describe('Build Project ', ()=>{
+describe('Build Project', ()=>{
     // fs mock
     const mnt = path.join(__dirname, 'mockfs');
     const mtime = new Date();
@@ -54,12 +54,26 @@ foonum: 10`,
                 'myst.json': `{
     "outDir": "../out-proj3"
 }`,
+                'myst2.json': `{
+    "data": "data/",
+    "outDir": "../out-proj3"
+}`,
+                'data': {
+                    'foo.json': mockFs.file({
+                        content: '{"foo":"bar"}',
+                        mtime: new Date(tim + 7200000),
+                    }),
+                },
                 'index.jade': mockFs.file({
                     content: 'p pow!',
                     mtime,
                 }),
                 'foo.dust': mockFs.file({
-                    content: '<p>ぬ\u3099',
+                    content: '<p>ぬ\u3099</p>',
+                    mtime,
+                }),
+                'a.js': mockFs.file({
+                    content: 'while(1){}',
                     mtime,
                 }),
             },
@@ -69,6 +83,10 @@ foonum: 10`,
                 'foo.html': mockFs.file({
                     content: 'I AM FOO',
                     mtime: new Date(tim + 3600000),
+                }),
+                'a.js': mockFs.file({
+                    content: 'alert(0)',
+                    mtime: new Date(tim - 3600000),
                 }),
             },
         });
@@ -141,9 +159,24 @@ foonum: 10`,
         build({
             cwd: projDir,
         }).then(()=>{
-            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html', 'a.js'].sort());
             expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
             expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('I AM FOO');
+            expect(fs.readFileSync(path.join(outDir, 'a.js'), 'utf8')).toBe('while(1){}');
+            done();
+        }).catch(done.fail);
+    });
+    it('check mtime of data', done=>{
+        const projDir = path.join(mnt, 'proj3');
+        const outDir = path.join(mnt, 'out-proj3');
+        build({
+            cwd: projDir,
+            project: 'myst2.json',
+        }).then(()=>{
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html', 'a.js'].sort());
+            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+            expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>ぬ\u3099</p>');
+            expect(fs.readFileSync(path.join(outDir, 'a.js'), 'utf8')).toBe('while(1){}');
             done();
         }).catch(done.fail);
     });

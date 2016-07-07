@@ -8,5 +8,7 @@ const path = require('path');
 const mld = require('my-load-data');
 
 export function loadData(datadir: string): Promise<any>{
-    return mld.fromDirectory(datadir);
+    return mld.fromDirectory(datadir, {
+        mtime: true,
+    });
 }

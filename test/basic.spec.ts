@@ -61,15 +61,20 @@ foonum: 10`,
     });
     it('data directory', done=>{
         const datadir = path.join(mnt, 'proj1', 'data');
+        const foomtime = fs.statSync(path.join(datadir, 'foo.yaml')).mtime.getTime();
+        const barmtime = fs.statSync(path.join(datadir, 'bar.json')).mtime.getTime();
         loadData(datadir).then(obj=>{
             expect(obj).toEqual({
                 foo: {
                     foobar: '吉野家',
                     foonum: 10,
+                    $mtime: foomtime,
                 },
                 bar: {
                     welcome: 'to my bar',
+                    $mtime: barmtime,
                 },
+                $mtime: Math.max(foomtime, barmtime),
             });
             done();
         }).catch(done.fail);
