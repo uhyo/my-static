@@ -201,26 +201,30 @@ namespace renderUtil{
     export function makeDustjsRenderer(ctx: RenderContext): RenderFunction {
         const dust = ctx.localRequire('dustjs-linkedin');
         ctx.localRequire('dustjs-helpers');
-        return (path: string, outDir: string, options?: any)=>{
+        return (file: string, outDir: string, options?: any)=>{
             return new Promise((resolve, reject)=>{
-                fs.readFile(path, (err, buf)=>{
+                fs.readFile(file, (err, buf)=>{
                     if (err != null){
                         reject(err);
                         return;
                     }
-                    fs.stat(path, (err, st)=>{
+                    fs.stat(file, (err, st)=>{
                         if (err != null){
                             reject(err);
                             return;
                         }
+                        // onload hook
+                        dust.onLoad = (templatepath: string, callback: (err: any, content: string)=>void)=>{
+                            fs.readFile(path.resolve(path.dirname(file), templatepath), 'utf8', callback);
+                        };
                         const t = dust.compile(buf.toString(), path);
                         dust.loadSource(t);
-                        dust.render(path, options, (err, html)=>{
+                        dust.render(file, options, (err, html)=>{
                             if (err != null){
                                 reject(err);
                                 return;
                             }
-                            resolve(HTMLSaveAction(ctx, path, outDir, html, st.mtime.getTime()));
+                            resolve(HTMLSaveAction(ctx, file, outDir, html, st.mtime.getTime()));
                         });
                     });
                 });
