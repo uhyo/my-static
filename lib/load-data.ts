@@ -4,13 +4,28 @@
 import {
     ProjectSettings,
 } from './conf';
+import * as log from './log';
+
 const path = require('path');
 const fs = require('fs');
 const mld = require('my-load-data');
 
 // load data and treat cache.
 export function loadData(datadir: string, cachefile?: string): Promise<any>{
-    const cachep = cachefile ? mld.fromFile(cachefile) : Promise.resolve(null);
+    log.verbose('loadData', 'loading data from %s', datadir);
+    if (cachefile){
+        log.verbose('loadData', 'loading cache from %s', cachefile);
+    }
+
+    const cachep = cachefile ? mld.fromFile(cachefile).catch(e=>{
+        if (e.code === 'ENOENT'){
+            // no cache yet
+            log.verbose('loadData', 'could not load cache');
+            return null;
+        }else{
+            throw e;
+        }
+    }): Promise.resolve(null);
     return cachep.then(cache=> mld.fromDirectory(datadir, {
         mtime: true,
         cache,
@@ -23,6 +38,7 @@ export function loadData(datadir: string, cachefile?: string): Promise<any>{
                     if (err != null){
                         reject(err);
                     }else{
+                        log.verbose('loadData', 'wrote cache to %s', cachefile);
                         resolve(obj);
                     }
                 });
