@@ -13,6 +13,10 @@ import {
     loadData,
 } from '../lib/load-data';
 
+import * as log from '../lib/log';
+
+log.setLogLevel(log.LogLevel.none);
+
 
 const pkgDir = require('pkg-dir');
 const fs = require('fs');
@@ -143,37 +147,37 @@ describe('Render File', ()=>{
     });
     it('jade', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'index.jade'), outDir).then(()=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'index.html'), '<p data-foo=\'3\'>pow!</p>', tim);
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'index.html'), '<p data-foo=\'3\'>pow!</p>');
             done();
         }).catch(done.fail);
     });
     it('ejs', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'foo.ejs'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'foo.html'), '<p>cow!3</p>', tim);
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'foo.html'), '<p>cow!3</p>');
             done();
         }).catch(done.fail);
     });
     it('dustjs', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'bar.dust'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'bar.html'), '<p>wow! 3</p>', tim);
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'bar.html'), '<p>wow! 3</p>');
             done();
         }).catch(done.fail);
     });
     it('html', done=>{
         renderFile(ctx, path.join(ctx.projdir, '吉野家.html'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, '吉野家.html'), '<table><tr><td>row!</td></tr></table>', tim);
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, '吉野家.html'), '<table><tr><td>row!</td></tr></table>');
             done();
         }).catch(done.fail);
     });
     it('js', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'a.js'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.js'), 'alert(1);', tim);
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.js'), 'alert(1);');
             done();
         }).catch(done.fail);
     });
     it('css', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'a.css'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.css'), 'body {color: red;}', tim);
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.css'), 'body {color: red;}');
             done();
         }).catch(done.fail);
     });

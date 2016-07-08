@@ -4,6 +4,10 @@ import {
     build,
 } from '../lib/main';
 
+import * as log from '../lib/log';
+
+log.setLogLevel(log.LogLevel.none);
+
 const fs = require('fs');
 const path = require('path');
 

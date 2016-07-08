@@ -3,7 +3,8 @@
         "module": "commonjs",
         "moduleResolution": "node",
         "target": "es5",
-        "outDir": "dist/"
+        "outDir": "dist/",
+        "noEmitOnError": true
     },
     "exclude": [
         "node_modules",

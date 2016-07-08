@@ -97,42 +97,45 @@ export class RenderContext{
             }
         }
     }
-    // ファイルにかきこみ （変更がないファイルはアレしない）
-    public saveFile(file: string, content: string, mtime?: number): Promise<any>{
+    // htmlファイル用に拡張子を付け替える
+    public getTargetFile(file: string, outDir: string): string{
+        const ext = path.extname(file);
+        const base = path.basename(file, ext);
+        return path.join(outDir, base + this.settings.outExt);
+    }
+    // このファイルはrerenderが必要か
+    // target: 書き込み対象ファイル名
+    // mtime: 元のファイルのmtime
+    public needsRender(target: string, mtime?: number): Promise<boolean>{
+        if (mtime == null){
+            return Promise.resolve(true);
+        }
         return new Promise((resolve, reject)=>{
-            const wr = ()=>{
-                fs.writeFile(file, content, err=>{
-                    if (err != null){
-                        reject(err);
-                        return;
-                    }
-                    resolve();
-                });
-            };
-            if (mtime == null){
-                wr();
-            }else{
-                fs.stat(file, (err, st)=>{
-                    if (err != null){
-                        if (err.code === 'ENOENT'){
-                            // ファイルがないので書くべき
-                            wr();
-                        }else{
-                            reject(err);
-                        }
-                        return;
-                    }
-                    // ファイルの更新日時をチェック
-                    const m = st.mtime.getTime();
-                    if (m < mtime || (this.basemtime != null && m < this.basemtime)){
-                        // より新しいデータが来たので書き換える
-                        wr();
+            fs.stat(target, (err, st)=>{
+                if (err != null){
+                    if (err.code === 'ENOENT'){
+                        // ファイルがないので書く必要がある
+                        resolve(true);
                     }else{
-                        // 何もせずに
-                        resolve();
+                        reject(err);
                     }
-                });
-            }
+                    return;
+                }
+                const m = st.mtime.getTime();
+                resolve(m < mtime || (this.basemtime != null && m < this.basemtime));
+            });
+        });
+    }
+    // ファイルにかきこみ （変更がないファイルはアレしない）
+    public saveFile(file: string, content: string): Promise<any>{
+        return new Promise((resolve, reject)=>{
+            fs.writeFile(file, content, err=>{
+                if (err != null){
+                    reject(err);
+                    return;
+                }
+                resolve();
+            });
         });
     }
 }
@@ -191,21 +194,32 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
 namespace renderUtil{
     // expressのあれに対応したrendererを作る
     export function makeExpressRenderer(ctx: RenderContext, func: ExpressFriendlyRenderFunction): RenderFunction{
-        return (path: string, outDir: string, options?: any)=> new Promise((resolve, reject)=>{
+        return (file: string, outDir: string, options?: any)=> new Promise((resolve, reject)=>{
             // ファイルの更新日時チェック
-            fs.stat(path, (err, st)=>{
+            fs.stat(file, (err, st)=>{
                 if (err != null){
                     reject(err);
                     return;
                 }
                 const mtime = st.mtime.getTime();
-                func(path, options, (err, html)=>{
-                    if (err != null){
-                        reject(err);
+                const saveFile = ctx.getTargetFile(file, outDir);
+                // htmlファイルのなまえ
+                resolve(ctx.needsRender(saveFile, mtime).then(b=>{
+                    if (!b){
+                        log.verbose('expressRenderer', 'skipped %s', file);
                         return;
+                    }else{
+                        return new Promise((resolve, reject)=>{
+                            func(file, options, (err, html)=>{
+                                if (err != null){
+                                    reject(err);
+                                    return;
+                                }
+                                resolve(mkdirpsave(ctx, saveFile, html));
+                            });
+                        });
                     }
-                    resolve(HTMLSaveAction(ctx, path, outDir, html, mtime));
-                });
+                }));
             });
         });
     }
@@ -215,30 +229,42 @@ namespace renderUtil{
         ctx.localRequire('dustjs-helpers');
         return (file: string, outDir: string, options?: any)=>{
             return new Promise((resolve, reject)=>{
-                fs.readFile(file, (err, buf)=>{
+                fs.stat(file, (err, st)=>{
                     if (err != null){
                         reject(err);
                         return;
                     }
-                    fs.stat(file, (err, st)=>{
-                        if (err != null){
-                            reject(err);
+                    const mtime = st.mtime.getTime();
+                    const saveFile = ctx.getTargetFile(file, outDir);
+
+                    resolve(ctx.needsRender(saveFile, mtime).then(b=>{
+                        if (!b){
+                            log.verbose('dustjsRenderer', 'skipped %s', file);
                             return;
+                        }else{
+                            return new Promise((resolve, reject)=>{
+                                fs.readFile(file, (err, buf)=>{
+                                    if (err != null){
+                                        reject(err);
+                                        return;
+                                    }
+                                    // onload hook
+                                    dust.onLoad = (templatepath: string, callback: (err: any, content: string)=>void)=>{
+                                        fs.readFile(path.resolve(path.dirname(file), templatepath), 'utf8', callback);
+                                    };
+                                    const t = dust.compile(buf.toString(), path);
+                                    dust.loadSource(t);
+                                    dust.render(file, options, (err, html)=>{
+                                        if (err != null){
+                                            reject(err);
+                                            return;
+                                        }
+                                        resolve(mkdirpsave(ctx, saveFile, html));
+                                    });
+                                });
+                            });
                         }
-                        // onload hook
-                        dust.onLoad = (templatepath: string, callback: (err: any, content: string)=>void)=>{
-                            fs.readFile(path.resolve(path.dirname(file), templatepath), 'utf8', callback);
-                        };
-                        const t = dust.compile(buf.toString(), path);
-                        dust.loadSource(t);
-                        dust.render(file, options, (err, html)=>{
-                            if (err != null){
-                                reject(err);
-                                return;
-                            }
-                            resolve(HTMLSaveAction(ctx, file, outDir, html, st.mtime.getTime()));
-                        });
-                    });
+                    }));
                 });
             });
         };
@@ -255,37 +281,39 @@ namespace renderUtil{
                         reject(err);
                         return;
                     }
-                    fs.readFile(file, (err, buf)=>{
-                        if (err != null){
-                            reject(err);
+                    const mtime = st.mtime.getTime();
+
+                    resolve(ctx.needsRender(target, mtime).then(b=>{
+                        if (!b){
+                            log.verbose('staticRenderer', 'skipped %s', file);
                             return;
+                        }else{
+                             return new Promise((resolve, reject)=>{
+                                 fs.readFile(file, (err, buf)=>{
+                                     if (err != null){
+                                         reject(err);
+                                         return;
+                                     }
+                                     resolve(mkdirpsave(ctx, target, buf.toString()));
+                                 });
+                             });
                         }
-                        mkdirp(outDir, err=>{
-                            if (err != null){
-                                reject(err);
-                                return;
-                            }
-                            resolve(ctx.saveFile(target, buf.toString(), st.mtime.getTime()));
-                        });
-                    });
+                    }));
                 });
             });
         };
     }
 
     // ただファイルに保存
-    // path: もとのファイル名
-    function HTMLSaveAction(ctx: RenderContext, file: string, outDir: string, html: string, mtime: number): Promise<any>{
-        const ext = path.extname(file);
-        const base = path.basename(file, ext);
+    function mkdirpsave(ctx: RenderContext, file: string, content: string): Promise<any>{
         // 拡張子を変える
-        const saveFile = path.join(outDir, base + ctx.settings.outExt);
+        const dir = path.dirname(file);
         return new Promise((resolve, reject)=>{
-            mkdirp(outDir, err=>{
+            mkdirp(dir, err=>{
                 if (err != null){
                     reject(err);
                 }else{
-                    resolve(ctx.saveFile(saveFile, html, mtime));
+                    resolve(ctx.saveFile(file, content));
                 }
             });
         });
