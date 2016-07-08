@@ -5,6 +5,8 @@ import {
     ProjectSettings,
 } from './conf';
 
+import * as log from './log';
+
 const fs = require('fs');
 const path = require('path');
 const mkdirp = require('mkdirp');
@@ -80,12 +82,17 @@ export class RenderContext{
                 basedir: this.projdir,
             });
             if (lc){
-                return require(lc);
+                const result = require(lc);
+                log.verbose('localRequire', 'Required %s from %s', name, lc);
+                return result;
             }
         }finally {
             try {
-                return require(name);
+                const result = require(name);
+                log.verbose('localRequire', 'Required bundled %s', name);
+                return result;
             }catch (e){
+                log.warning('localRequire', 'Failed to require %s', name);
                 return null;
             }
         }
@@ -132,6 +139,8 @@ export class RenderContext{
 
 export function renderDirectory(context: RenderContext, dir: string, outDir: string): Promise<any>{
     return new Promise((resolve, reject)=>{
+        log.verbose('renderDirectory', 'Started rendering directory %s', dir);
+        log.verbose('renderDirectory', 'Destination directory for this directory is: %s', outDir);
         fs.readdir(dir, (err, files)=>{
             if (err != null){
                 reject(err);
@@ -140,6 +149,7 @@ export function renderDirectory(context: RenderContext, dir: string, outDir: str
             const h = (i: number)=>{
                 const f = files[i];
                 if (f == null){
+                    log.verbose('renderDirectory', 'Finished rendering directory %s', dir);
                     return Promise.resolve();
                 }
                 // ディレクトリの中のファイル名
@@ -166,9 +176,11 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
                 const r = context.getRenderer(f);
                 if (r == null){
                     // 対応するRendererがない
+                    log.verbose('renderFile', 'skip: no renderer for %s', f);
                     resolve();
                     return;
                 }
+                log.verbose('renderFile', 'Rendering file %s', f);
                 resolve(r(f, outDir, context.data));
             }
         });
