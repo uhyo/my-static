@@ -17,11 +17,11 @@ const mountfs = require('mountfs');
 
 mountfs.patchInPlace();
 
+const mnt = path.join(__dirname, 'mockfs');
+const mtime = new Date();
+const tim = mtime.getTime();
 describe('Build Project', ()=>{
     // fs mock
-    const mnt = path.join(__dirname, 'mockfs');
-    const mtime = new Date();
-    const tim = mtime.getTime();
     beforeEach(()=>{
         const mock = mockFs.fs({
             '/proj1': {
@@ -363,6 +363,42 @@ block content
                 done();
             }).catch(done.fail);
         });
+    });
+});
+describe('dustjs feature', ()=>{
+    beforeEach(()=>{
+        const mock = mockFs.fs({
+            '/proj1': {
+                'myst.json': `{
+    "rootDir": "src",
+    "outDir": "../out"
+}`,
+                'layout': {
+                    'main.dust': `<div>foo {+body}body{/body} bar</div>`,
+                },
+                'src': {
+                    'index.dust': `{>"$PROJ/layout/main.dust"/}
+{<body}aiu{/body}`,
+                    'index2.dust': `{>"$ROOT/../layout/main.dust"/}`,
+                },
+            },
+        });
+        fs.mount(mnt, mock);
+    });
+    afterEach(()=>{
+        fs.unmount(mnt);
+    });
+    it('template name variables', done=>{
+        const projDir = path.join(mnt, 'proj1');
+        const outDir = path.join(mnt, 'out');
+        build({
+            cwd: projDir,
+        }).then(()=>{
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'index2.html'].sort());
+            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe(`<div>foo aiu bar</div>`);
+            expect(fs.readFileSync(path.join(outDir, 'index2.html'), 'utf8')).toBe(`<div>foo body bar</div>`);
+            done();
+        }).catch(done.fail);
     });
 });
 
