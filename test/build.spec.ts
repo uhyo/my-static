@@ -251,6 +251,20 @@ block content
             done();
         }).catch(done.fail);
     });
+    it('specify render target', done=>{
+        const projDir = path.join(mnt, 'proj2');
+        const outDir = path.join(mnt, 'out');
+        build({
+            cwd: path.join(projDir, 'contents'),
+            target: ['./*.jade'],
+        }).then(()=>{
+            // extraneous file?
+            expect(fs.readdirSync(outDir).sort()).toEqual(['index.html'].sort());
+            // check file
+            expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>welcome to my bar</p>');
+            done();
+        }).catch(done.fail);
+    });
     describe('mtime', ()=>{
         it('check mtime to save', done=>{
             const projDir = path.join(mnt, 'proj3');
