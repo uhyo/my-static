@@ -270,6 +270,12 @@ namespace renderUtil{
     export function makeDustjsRenderer(ctx: RenderContext): RenderFunction {
         const dust = ctx.localRequire('dustjs-linkedin');
         ctx.localRequire('dustjs-helpers');
+
+        const {
+            projdir,
+            settings,
+        } = ctx;
+
         return (file: string, outDir: string, options?: any)=>{
             return new Promise((resolve, reject)=>{
                 fs.stat(file, (err, st)=>{
@@ -293,7 +299,18 @@ namespace renderUtil{
                                     }
                                     // onload hook
                                     dust.onLoad = (templatepath: string, callback: (err: any, content: string)=>void)=>{
-                                        fs.readFile(path.resolve(path.dirname(file), templatepath), 'utf8', callback);
+                                        // dust用の便利なあれ
+                                        const tp = templatepath.replace(/\$(\w+)(?!\w)/g, (al: string, name: string)=>{
+                                            switch (name.toLowerCase()){
+                                                case 'proj':
+                                                    return projdir;
+                                                case 'root':
+                                                    return settings.rootDir;
+                                                default:
+                                                    return al;
+                                            }
+                                        });
+                                        fs.readFile(path.resolve(path.dirname(file), tp), 'utf8', callback);
                                     };
                                     const t = dust.compile(buf.toString(), path);
                                     dust.loadSource(t);
