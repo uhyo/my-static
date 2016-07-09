@@ -29,8 +29,8 @@ export function loadData(datadir: string, cachefile?: string): Promise<any>{
     return cachep.then(cache=> mld.fromDirectory(datadir, {
         mtime: true,
         cache,
-    })).then(obj=>{
-        if (cachefile){
+    }).then(obj=>{
+        if (cachefile && (!cache || cache['$mtime'] < obj['$mtime'])){
             return new Promise((resolve, reject)=>{
                 // save cache.
                 // TODO: what if cache file is not json?
@@ -46,7 +46,7 @@ export function loadData(datadir: string, cachefile?: string): Promise<any>{
         }else{
             return obj;
         }
-    });
+    }));
 }
 
 // mtime of file / directory.
