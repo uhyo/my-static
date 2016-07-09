@@ -8,7 +8,7 @@ import {
 } from './conf';
 import {
     RenderContext,
-    renderDirectory,
+    renderGlob,
 } from './render';
 import {
     loadData,
@@ -63,7 +63,19 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
     }else{
         settings.rootDir = projdir;
     }
+    if ('string' === typeof settings.target){
+        // 文字列も許したいから無理やりキャスト
+        settings.target = [settings.target as any as string];
+    }
+    if (Array.isArray(settings.target)){
+        // 相対パスだと困るから
+        settings.target = settings.target.map(p=> path.resolve(projdir, p));
+    }else{
+        // デフォルトは全部
+        settings.target = [path.join(settings.rootDir, '*')];
+    }
     log.verbose('makeContext', 'rootDir: %s', settings.rootDir);
+    log.verbose('makeContext', 'target: %s', settings.target.join(', '));
     if (settings.outDir){
         settings.outDir = path.resolve(projdir, settings.outDir);
     }
@@ -104,14 +116,14 @@ export function render(context: RenderContext): Promise<any>{
     const {
         rootDir,
         outDir,
+        target,
     } = settings;
     if (!outDir){
         log.error('outDir is not provided');
         return Promise.reject(new Error('outDir is not provided'));
     }
     // rootDirが相対パスかもしれないので
-    const r = path.resolve(projdir, rootDir);
-    return renderDirectory(context, r, outDir);
+    return renderGlob(context, target);
 }
 
 // Start building.

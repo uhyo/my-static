@@ -1,6 +1,8 @@
 /// <reference path='../typings/bundle.d.ts' />
 // default config
 
+const path = require('path');
+
 const DEFAULT_PROJECT_FILE = 'myst.json';
 const DEFAULT_OUT_EXT = '.html';
 
@@ -15,6 +17,8 @@ export interface BuildOptions{
     outDir?: string;
     // extension of html files
     outExt?: string;
+    // build target file
+    target?: Array<string>;
 }
 
 // myst.jsonの中身
@@ -28,6 +32,8 @@ export interface ProjectSettings{
     cache: string;
     // 依存ファイルの一覧
     dependency: string | Array<string>;
+    // render対象ファイル
+    target: Array<string>;
 }
 
 // BuildOptionsにデフォルト設定を書き込む
@@ -51,6 +57,10 @@ export function overwriteSettings(options: BuildOptions, settings: ProjectSettin
         settings.outExt = options.outExt;
     }else if (!settings.outExt){
         settings.outExt = DEFAULT_OUT_EXT;
+    }
+    if (Array.isArray(options.target)){
+        // build targetはcwdからあれしてると思う
+        settings.target = options.target.map(f => path.resolve(options.cwd, f));
     }
     return settings;
 }

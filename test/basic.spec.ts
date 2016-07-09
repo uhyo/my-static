@@ -103,6 +103,7 @@ describe('Render File', ()=>{
         data: null,
         cache: null,
         dependency: null,
+        target: null,
     };
     const ctx = new RenderContext(projdir, data, null, settings);
     const mtime = new Date();

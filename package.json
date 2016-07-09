@@ -57,6 +57,7 @@
     "ejs": "^2.4.2",
     "es6-promise": "^3.2.1",
     "find-up": "^1.1.2",
+    "globby": "^5.0.0",
     "jade": "^1.11.0",
     "my-load-data": "^1.1.0-rc1",
     "resolve": "^1.1.7"

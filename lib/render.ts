@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const mkdirp = require('mkdirp');
 const resolve = require('resolve');
+const globby = require('globby');
 
 export interface ExpressFriendlyRenderFunction{
     (path: string, options: any, callback: any): void;
@@ -140,6 +141,52 @@ export class RenderContext{
     }
 }
 
+export function renderGlob(context: RenderContext, pattern: Array<string>): Promise<any>{
+    const {
+        settings: {
+            rootDir,
+            outDir,
+        },
+    } = context;
+    return globby(pattern).then(files=>{
+        // rootDirからの相対パス
+        const files2 = [];
+        for (let f of files){
+            const r = path.relative(rootDir, f);
+            if (r.split(path.sep, 1)[0] === '..'){
+                // rootDirをでている
+                log.error('Target file %s is out of the root directory %s', f, rootDir);
+                return Promise.reject(new Error('Failed to render files'));
+            }
+            files2.push({
+                file: f,
+                outDir: path.join(outDir, path.dirname(r)),
+            });
+        }
+        return renderFiles(context, files2);
+    });
+}
+
+function renderFiles(context: RenderContext, files: Array<{
+    // files
+    file: string;
+    outDir: string;
+}>): Promise<any>{
+    // 複数ファイルをsequentialにrenderする
+    const h = (i: number)=>{
+        const f = files[i];
+        if (f == null){
+            return Promise.resolve();
+        }
+        const {
+            file,
+            outDir,
+        } = f;
+        return renderFile(context, file, outDir).then(()=> h(i+1));
+    };
+    return h(0);
+}
+
 export function renderDirectory(context: RenderContext, dir: string, outDir: string): Promise<any>{
     return new Promise((resolve, reject)=>{
         log.verbose('renderDirectory', 'Started rendering directory %s', dir);
@@ -149,17 +196,13 @@ export function renderDirectory(context: RenderContext, dir: string, outDir: str
                 reject(err);
                 return;
             }
-            const h = (i: number)=>{
-                const f = files[i];
-                if (f == null){
-                    log.verbose('renderDirectory', 'Finished rendering directory %s', dir);
-                    return Promise.resolve();
-                }
-                // ディレクトリの中のファイル名
-                const p = path.join(dir, f);
-                return renderFile(context, p, outDir).then(()=> h(i+1));
-            };
-            resolve(h(0));
+            const ps = files.map(f => ({
+                file: path.join(dir, f),
+                outDir,
+            }));
+            resolve(renderFiles(context, ps).then(()=>{
+                log.verbose('renderDirectory', 'Finished rendering directory %s', dir);
+            }));
         });
     });
 }
