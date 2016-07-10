@@ -71,6 +71,12 @@ export class RenderContext{
             case '.css':
             case '.js':
                 return (renderers[ext] = renderUtil.makeStaticRenderer(this));
+
+            // Others
+            case '.sass':
+            case '.scss':
+                return (renderers[ext] = renderUtil.makeSassRenderer(this));
+
             default:
                 return null;
         }
@@ -78,24 +84,25 @@ export class RenderContext{
     }
     // require modules from local project is possible
     public localRequire(name: string): any{
+        let result = null;
         try {
             const lc = resolve.sync(name, {
                 basedir: this.projdir,
             });
             if (lc){
-                const result = require(lc);
+                result = require(lc);
                 log.verbose('localRequire', 'Required %s from %s', name, lc);
-                return result;
             }
         }finally {
-            try {
-                const result = require(name);
-                log.verbose('localRequire', 'Required bundled %s', name);
-                return result;
-            }catch (e){
-                log.warning('localRequire', 'Failed to require %s', name);
-                return null;
+            if (result == null){
+                try {
+                    result = require(name);
+                    log.verbose('localRequire', 'Required bundled %s', name);
+                }catch (e){
+                    log.warning('Failed to require %s', name);
+                }
             }
+            return result;
         }
     }
     // htmlファイル用に拡張子を付け替える
@@ -357,6 +364,48 @@ namespace renderUtil{
                                      resolve(mkdirpsave(ctx, target, buf.toString()));
                                  });
                              });
+                        }
+                    }));
+                });
+            });
+        };
+    }
+    // sass
+    export function makeSassRenderer(ctx: RenderContext): RenderFunction {
+        const sass = ctx.localRequire('node-sass');
+        return (file: string, outDir: string)=>{
+            return new Promise((resolve, reject)=>{
+                if (sass == null){
+                    log.verbose('sassRenderer', 'skipped %s : node-sass does not exist', file);
+                    resolve();
+                    return;
+                }
+                fs.stat(file, (err, st)=>{
+                    if (err != null){
+                        reject(err);
+                        return;
+                    }
+                    const mtime = st.mtime.getTime();
+                    const ext = path.extname(file);
+                    const base = path.basename(file, ext);
+                    const saveFile = path.join(outDir, base + '.css');
+                    resolve(ctx.needsRender(saveFile, mtime).then(b=>{
+                        if (!b){
+                            log.verbose('sassRenderer', 'skipped %s', file);
+                            return;
+                        }else{
+                            return new Promise((resolve, reject)=>{
+                                sass.render({
+                                    file,
+                                }, (err, result)=>{
+                                    if (err != null){
+                                        log.error('Error rendering %s: [ %s ]', file, err);
+                                        reject(err);
+                                        return;
+                                    }
+                                    resolve(mkdirpsave(ctx, saveFile, result.css));
+                                });
+                            });
                         }
                     }));
                 });
