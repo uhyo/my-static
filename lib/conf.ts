@@ -11,6 +11,8 @@ export interface BuildOptions{
     cwd?: string;
     // filename of myst.json
     project?: string;
+    // enable watching
+    watch?: boolean;
     // root directory of page files
     rootDir?: string;
     // output directory

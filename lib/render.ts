@@ -155,26 +155,33 @@ export function renderGlob(context: RenderContext, pattern: Array<string>): Prom
             outDir,
         },
     } = context;
-    return globby(pattern).then(files=>{
-        // rootDirからの相対パス
-        const files2 = [];
-        for (let f of files){
-            const r = path.relative(rootDir, f);
-            if (r.split(path.sep, 1)[0] === '..'){
-                // rootDirをでている
-                log.error('Target file %s is out of the root directory %s', f, rootDir);
-                return Promise.reject(new Error('Failed to render files'));
-            }
-            files2.push({
-                file: f,
-                outDir: path.join(outDir, path.dirname(r)),
-            });
+    return globby(pattern).then(files=>renderFiles(context, files));
+}
+// ファイルから書き込み対象フォルダも探す
+export function renderFiles(context: RenderContext, files: Array<string>): Promise<any>{
+    const {
+        settings: {
+            rootDir,
+            outDir,
+        },
+    } = context;
+    const files2 = [];
+    for (let f of files){
+        const r = path.relative(rootDir, f);
+        if (r.split(path.sep, 1)[0] === '..'){
+            // rootDirをでている
+            log.error('Target file %s is out of the root directory %s', f, rootDir);
+            return Promise.reject(new Error('Failed to render files'));
         }
-        return renderFiles(context, files2);
-    });
+        files2.push({
+            file: f,
+            outDir: path.join(outDir, path.dirname(r)),
+        });
+    }
+    return renderFilesAt(context, files2);
 }
 
-function renderFiles(context: RenderContext, files: Array<{
+function renderFilesAt(context: RenderContext, files: Array<{
     // files
     file: string;
     outDir: string;
@@ -207,7 +214,7 @@ export function renderDirectory(context: RenderContext, dir: string, outDir: str
                 file: path.join(dir, f),
                 outDir,
             }));
-            resolve(renderFiles(context, ps).then(()=>{
+            resolve(renderFilesAt(context, ps).then(()=>{
                 log.verbose('renderDirectory', 'Finished rendering directory %s', dir);
             }));
         });

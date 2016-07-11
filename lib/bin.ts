@@ -19,6 +19,7 @@ const pkg = require(path.join(pkgDir.sync(__dirname), 'package.json'));
 cli.parse({
     project: ['p', 'Project file', 'path'],
     outDir: ['o', 'Output directory', 'path'],
+    watch: ['w', 'Watch'],
     // logs
     quiet: ['q', 'Quiet logs'],
     verbose: [null, 'Verbose logs'],
@@ -35,9 +36,9 @@ cli.main((args, options)=>{
     build({
         project: options.project,
         outDir: options.outDir,
+        watch: !!options.watch,
     }).then(()=>{
         log.info('Build done.');
-        process.exit(0);
     }).catch(e=>{
         if (e){
             log.error(e);

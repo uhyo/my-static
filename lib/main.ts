@@ -9,7 +9,11 @@ import {
 import {
     RenderContext,
     renderGlob,
+    renderFiles,
 } from './render';
+import {
+    watchProject,
+} from './watch';
 import {
     loadData,
     getMTime,
@@ -20,6 +24,7 @@ import * as log from './log';
 const path = require('path');
 
 const findUp = require('find-up');
+const watch = require('watch');
 const mld = require('my-load-data');
 
 interface FoundProject{
@@ -79,6 +84,10 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
     if (settings.outDir){
         settings.outDir = path.resolve(projdir, settings.outDir);
     }
+    if (!settings.outDir){
+        log.error('outDir is not provided');
+        return Promise.reject(new Error('outDir is not provided'));
+    }
     log.verbose('makeContext', 'outDir: %s', settings.outDir);
     // data directory.
     if ('string' !== typeof settings.data){
@@ -118,16 +127,55 @@ export function render(context: RenderContext): Promise<any>{
         outDir,
         target,
     } = settings;
-    if (!outDir){
-        log.error('outDir is not provided');
-        return Promise.reject(new Error('outDir is not provided'));
-    }
     // rootDirが相対パスかもしれないので
     return renderGlob(context, target);
+}
+
+// Watch.
+export function watchToRender(context: RenderContext): any{
+    watchProject(context).then(monitor=>{
+        log.info('Watch started.');
+        const {
+            settings: {
+                rootDir,
+            },
+        } = context;
+        // Rendering flag.
+        let rendering = false;
+        monitor.on('updated', (f, stat)=>{
+            if (rendering === false){
+                rendering = true;
+                // ビルド対象ファイルがアップデートしたのでそれだけ更新
+                log.info('Target file is updated. Rerendering...');
+                renderFiles(context, [f]).then(()=>{
+                    log.info('Rendering done.');
+                }).catch(e=>log.error(e)).then(()=>{
+                    rendering = false;
+                });
+            }
+        });
+        monitor.on('removed', (f, stat)=>{
+            // TODO
+            log.verbose('watchToRender', 'Target file is removed');
+        });
+        monitor.on('data-updated', (f, curr, prev)=>{
+            if (rendering === false){
+                rendering = true;
+                log.info('Dependency directory is updated. Rerendering...');
+                render(context).then(()=>{
+                    log.info('Rendering done.');
+                }).catch(e=>log.error(e)).then(()=>{
+                    rendering = false;
+                });
+            }
+        });
+    }).catch(e=>log.error(e));
 }
 
 // Start building.
 export function build(options: BuildOptions = {}): Promise<any>{
     defaultBuildOptions(options);
-    return findProject(options).then(makeContext).then(render);
+
+    const action = options.watch ? (context=>render(context).then(()=>watchToRender(context))) : render;
+    return findProject(options).then(makeContext).then(action);
 }
