@@ -89,31 +89,9 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
         return Promise.reject(new Error('outDir is not provided'));
     }
     log.verbose('makeContext', 'outDir: %s', settings.outDir);
-    // data directory.
-    if ('string' !== typeof settings.data){
-        log.verbose('makeContext', 'data directory is not specified.');
-        return Promise.resolve(new RenderContext(projdir, {}, null, settings));
-    }
-    // cache?
-    const {
-        cache,
-        dependency,
-    } = settings;
-    const cachedir = 'string' === typeof cache ? path.resolve(projdir, cache) : null;
-
-    const datadir = path.resolve(projdir, settings.data);
-    const dependency_a = Array.isArray(dependency) ? dependency : dependency ? [dependency] : [];
-    const dependency_aa = dependency_a.map(p=>path.resolve(projdir, p));
-    log.verbose('makeContext', 'datadir: %s', datadir);
-
-    return Promise.all([getMTime(dependency_aa), loadData(datadir, cachedir)]).then(([mtime, data])=>{
-        // dataの最終更新時間
-        const datamtime = data ? data['$mtime'] || null : null;
-        const basemtime = Math.max(mtime, datamtime);
-        log.verbose('makeContext', 'Last modified time of datadir: %s', new Date(datamtime));
-        log.verbose('makeContext', 'Last modified time of other dependencies: %s', new Date(mtime));
-        return new RenderContext(projdir, data, basemtime, settings);
-    });
+    // make context.
+    const ctx = new RenderContext(projdir, settings);
+    return Promise.all([ctx.loadData(), ctx.readDependency()]).then(()=> ctx);
 }
 
 // Build files.
@@ -138,11 +116,12 @@ export function watchToRender(context: RenderContext): any{
         const {
             settings: {
                 rootDir,
+                data,
             },
         } = context;
         // Rendering flag.
         let rendering = false;
-        monitor.on('updated', (f, stat)=>{
+        monitor.on('updated', f=>{
             if (rendering === false){
                 rendering = true;
                 // ビルド対象ファイルがアップデートしたのでそれだけ更新
@@ -158,11 +137,22 @@ export function watchToRender(context: RenderContext): any{
             // TODO
             log.verbose('watchToRender', 'Target file is removed');
         });
-        monitor.on('data-updated', (f, curr, prev)=>{
+        monitor.on('data-updated', f=>{
             if (rendering === false){
                 rendering = true;
                 log.info('Dependency directory is updated. Rerendering...');
-                render(context).then(()=>{
+                context.loadData().then(()=>render(context)).then(()=>{
+                    log.info('Rendering done.');
+                }).catch(e=>log.error(e)).then(()=>{
+                    rendering = false;
+                });
+            }
+        });
+        monitor.on('dep-updated', f=>{
+            if (rendering === false){
+                rendering = true;
+                log.info('Dependency directory is updated. Rerendering...');
+                context.readDependency().then(()=>render(context)).then(()=>{
                     log.info('Rendering done.');
                 }).catch(e=>log.error(e)).then(()=>{
                     rendering = false;

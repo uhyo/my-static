@@ -105,7 +105,8 @@ describe('Render File', ()=>{
         dependency: null,
         target: null,
     };
-    const ctx = new RenderContext(projdir, data, null, settings);
+    const ctx = new RenderContext(projdir, settings);
+    ctx.data = data;
     const mtime = new Date();
     const tim = mtime.getTime();
 

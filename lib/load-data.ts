@@ -23,9 +23,11 @@ export function loadData(datadir: string, cachefile?: string): Promise<any>{
             log.verbose('loadData', 'could not load cache');
             return null;
         }else{
+            log.error('Error while loading %s : [ %s ]', cachefile, e);
             throw e;
         }
     }): Promise.resolve(null);
+
     return cachep.then(cache=> mld.fromDirectory(datadir, {
         mtime: true,
         cache,
@@ -46,7 +48,10 @@ export function loadData(datadir: string, cachefile?: string): Promise<any>{
         }else{
             return obj;
         }
-    }));
+    })).catch(e=>{
+        log.error('Error while loading data: [ %s ]', e);
+        throw e;
+    });
 }
 
 // mtime of file / directory.

@@ -58,6 +58,22 @@ export function watchProject(ctx: RenderContext): Promise<EventEmitter>{
                 resolve(e);
             }
         };
+        const fdp = (monitor)=>{
+            // dependency用
+            monitor.on('created', (f, stat)=>{
+                e.emit('dep-updated', f);
+            });
+            monitor.on('removed', (f, stat)=>{
+                e.emit('dep-updated', f);
+            });
+            monitor.on('changed', (f, curr, prev)=>{
+                e.emit('dep-updated', f);
+            });
+
+            if (++cnt >= allcnt){
+                resolve(e);
+            }
+        };
 
         // build対象ファイルをwatch
         const rootDir = path.resolve(projdir, settings.rootDir);
@@ -84,7 +100,7 @@ export function watchProject(ctx: RenderContext): Promise<EventEmitter>{
             for (let d of dependency_aa){
                 watch.createMonitor(d, {
                     ignoreDotFiles: true,
-                }, fd);
+                }, fdp);
                 allcnt++;
             }
         }

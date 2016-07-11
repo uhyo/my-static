@@ -4,6 +4,10 @@
 import {
     ProjectSettings,
 } from './conf';
+import {
+    loadData,
+    getMTime,
+} from './load-data';
 
 import * as log from './log';
 
@@ -33,16 +37,14 @@ export class RenderContext{
     public projdir: string;
     public data: any;
     public settings: ProjectSettings;
+    private basemtime: number = -Infinity;
     private renderers: {
         [ext: string]: RenderFunction;
     };
-    private basemtime: number;
-    constructor(projdir: string, data: any, basemtime: number, settings: ProjectSettings){
+    constructor(projdir: string, settings: ProjectSettings){
         this.projdir = projdir;
-        this.data = data;
         this.settings = settings;
         this.renderers = {};
-        this.basemtime = basemtime;
     }
     // 拡張子に対応するrendererを読み込む
     public getRenderer(filepath: string): RenderFunction {
@@ -105,6 +107,52 @@ export class RenderContext{
             return result;
         }
     }
+    // load data into context
+    public loadData(): Promise<any>{
+        const {
+            projdir,
+            settings,
+        } = this;
+        if ('string' !== typeof settings.data){
+            log.verbose('makeContext', 'data directory is not specified.');
+            this.data = {};
+            return Promise.resolve();
+        }
+        const datadir = path.resolve(projdir, settings.data);
+        const cachefile = 'string' === typeof settings.cache ? path.resolve(projdir, settings.cache) : null;
+
+        log.verbose('loadData', 'datadir: %s', datadir);
+        if (cachefile != null){
+            log.verbose('loadData', 'cachefile: %s', datadir);
+        }
+        return loadData(datadir, cachefile).then(data=>{
+            const datamtime = data ? data['$mtime'] || null : null;
+            if (datamtime != null && isFinite(datamtime)){
+                log.verbose('loadData', 'Last modified time of datadir: %s', new Date(datamtime));
+                this.basemtime = Math.max(datamtime, this.basemtime);
+            }
+            this.data = data || {};
+        });
+    }
+    // read mtime of dependencies.
+    public readDependency(): Promise<any>{
+        const {
+            projdir,
+            settings,
+        } = this;
+        const {
+            dependency,
+        } = settings;
+        const dependency_a = Array.isArray(dependency) ? dependency : dependency ? [dependency] : [];
+        const dependency_aa = dependency_a.map(p=>path.resolve(projdir, p));
+        return getMTime(dependency_aa).then(mtime=>{
+            if (mtime != null && isFinite(mtime)){
+                log.verbose('loadData', 'Last modified time of other dependencies: %s', new Date(mtime));
+                this.basemtime = Math.max(mtime, this.basemtime);
+            }
+        });
+    }
+    // ====================
     // htmlファイル用に拡張子を付け替える
     public getTargetFile(file: string, outDir: string): string{
         const ext = path.extname(file);

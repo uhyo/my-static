@@ -37,6 +37,7 @@ cli.main((args, options)=>{
         project: options.project,
         outDir: options.outDir,
         watch: !!options.watch,
+        target: args.length > 0 ? args : null,
     }).then(()=>{
         log.info('Build done.');
     }).catch(e=>{
