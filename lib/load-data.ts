@@ -11,13 +11,13 @@ const fs = require('fs');
 const mld = require('my-load-data');
 
 // load data and treat cache.
-export function loadData(datadir: string, cachefile?: string): Promise<any>{
+export function loadData(datadir: string, cachefile?: string, cache?: any): Promise<any>{
     log.verbose('loadData', 'loading data from %s', datadir);
-    if (cachefile){
+    if (cachefile && cache == null){
         log.verbose('loadData', 'loading cache from %s', cachefile);
     }
-
-    const cachep = cachefile ? mld.fromFile(cachefile).catch(e=>{
+    const cachep = cache != null ? Promise.resolve(cache) :
+                   cachefile ? mld.fromFile(cachefile).catch(e=>{
         if (e.code === 'ENOENT'){
             // no cache yet
             log.verbose('loadData', 'could not load cache');

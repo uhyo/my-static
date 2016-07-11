@@ -122,10 +122,10 @@ export class RenderContext{
         const cachefile = 'string' === typeof settings.cache ? path.resolve(projdir, settings.cache) : null;
 
         log.verbose('loadData', 'datadir: %s', datadir);
-        if (cachefile != null){
+        if (cachefile != null && this.data == null){
             log.verbose('loadData', 'cachefile: %s', datadir);
         }
-        return loadData(datadir, cachefile).then(data=>{
+        return loadData(datadir, cachefile, this.data).then(data=>{
             const datamtime = data ? data['$mtime'] || null : null;
             if (datamtime != null && isFinite(datamtime)){
                 log.verbose('loadData', 'Last modified time of datadir: %s', new Date(datamtime));
