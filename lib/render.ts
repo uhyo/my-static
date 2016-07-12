@@ -51,7 +51,7 @@ export class RenderContext{
         const {
             renderers,
         } = this;
-        const ext = path.extname(filepath);
+        const ext = path.extname(filepath).toLowerCase();
         // from renderer cache
         const f = renderers[ext];
         if (f !=null){
