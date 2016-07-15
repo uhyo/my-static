@@ -105,12 +105,13 @@ describe('Render File', ()=>{
         dependency: null,
         target: null,
     };
-    const ctx = new RenderContext(projdir, settings);
-    ctx.data = data;
+    let ctx;
     const mtime = new Date();
     const tim = mtime.getTime();
 
     beforeEach(()=>{
+        ctx = new RenderContext(projdir, settings);
+        ctx.data = data;
         const mock = mockFs.fs({
             '/proj1': {
                 'index.jade': mockFs.file({
@@ -182,5 +183,19 @@ describe('Render File', ()=>{
             expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.css'), 'body {color: red;}');
             done();
         }).catch(done.fail);
+    });
+    describe('hooks', ()=>{
+        it('post-render hook', done=>{
+            ctx.addPostRenderHook((context, content, target, original)=>{
+                return target + content;
+            });
+            ctx.addPostRenderHook((context, content, target, original)=>{
+                return content + original;
+            });
+            renderFile(ctx, path.join(ctx.projdir, 'index.jade'), outDir).then(()=>{
+                expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'index.html'), path.join(outDir, 'index.html') + '<p data-foo=\'3\'>pow!</p>' + path.join(ctx.projdir, 'index.jade'));
+                done();
+            }).catch(done.fail);
+        });
     });
 });

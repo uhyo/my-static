@@ -23,16 +23,12 @@ export interface ExpressFriendlyRenderFunction{
 export interface RenderFunction{
     (path: string, outDir: string, options?: any): Promise<any>;
 }
-/*
-export interface RenderContext{
-    projdir: string;
-    data: any;
-    settings: ProjectSettings;
-    renderers: {
-        [ext: string]: ExpressFriendlyRenderFunction;
-    };
+
+// Hooks
+interface PostRenderHook{
+    (ctx: RenderContext, content: string, target: string, original: string): any;
 }
-*/
+
 export class RenderContext{
     public projdir: string;
     public data: any;
@@ -40,11 +36,13 @@ export class RenderContext{
     private basemtime: number = -Infinity;
     private renderers: {
         [ext: string]: RenderFunction;
-    };
+    } = {};
+    // hooks
+    private postRenderHooks: Array<PostRenderHook> = [];
+
     constructor(projdir: string, settings: ProjectSettings){
         this.projdir = projdir;
         this.settings = settings;
-        this.renderers = {};
     }
     // 拡張子に対応するrendererを読み込む
     public getRenderer(filepath: string): RenderFunction {
@@ -153,12 +151,71 @@ export class RenderContext{
         });
     }
     // ====================
+    // add hooks
+    public addPostRenderHook(func: PostRenderHook): void{
+        this.postRenderHooks.push(func);
+    }
+    // ====================
     // htmlファイル用に拡張子を付け替える
-    public getTargetFile(file: string, outDir: string): string{
+    public getTargetFile(file: string, outDir: string, outExt: string = this.settings.outExt): string{
         const ext = path.extname(file);
         const base = path.basename(file, ext);
-        return path.join(outDir, base + this.settings.outExt);
+        return path.join(outDir, base + outExt);
     }
+    // do stuff around rendering
+    public render(original: string, target: string, renderer: ()=>(string | Promise<string>)): Promise<any>{
+        return new Promise((resolve, reject)=>{
+            // stat original file and target file.
+            fs.stat(original, (err, st)=>{
+                if (err != null){
+                    reject(err);
+                    return;
+                }
+                const orig_mtime = st.mtime.getTime();
+                const data_mtime = Math.max(orig_mtime, this.basemtime != null ? this.basemtime : -Infinity);
+                fs.stat(target, (err, st)=>{
+                    // for target file
+                    if (err != null){
+                        if (err.code !== 'ENOENT'){
+                            reject(err);
+                            return;
+                        }
+                    }
+                    const target_mtime = st ? st.mtime.getTime() : -Infinity;
+                    // mtimeを比較してrerenderするか決定
+                    if (target_mtime >= data_mtime){
+                        // No need to rerender
+                        log.verbose('render', 'Skipped rendering %s: non need to rerender', original);
+                        resolve();
+                        return;
+                    }
+                    // request a render.
+                    const p = Promise.resolve(renderer());
+                    const p2 = p.then(content=>new Promise((resolve, reject)=>{
+                        if (content == null){
+                            // ???
+                            log.verbose('render', 'Skipped rendering %s: due to null content', target);
+                            resolve();
+                            return;
+                        }
+                        // apply postRenderHooks here.
+                        this.applyPostRenderHooks(content, target, original).then(content=>{
+                            // save to the target file.
+                            const dir = path.dirname(target);
+                            mkdirp(dir, err=>{
+                                if (err != null){
+                                    reject(err);
+                                }
+                                resolve(this.saveFile(target, content));
+                            });
+                        });
+                    }));
+                    resolve(p2);
+                });
+            });
+        });
+    }
+    //----- util for render.
     // このファイルはrerenderが必要か
     // target: 書き込み対象ファイル名
     // mtime: 元のファイルのmtime
@@ -193,6 +250,21 @@ export class RenderContext{
                 resolve();
             });
         });
+    }
+    private applyPostRenderHooks(content: string, target: string, original: string): Promise<string>{
+        const h = (i: number)=>{
+            const hook = this.postRenderHooks[i];
+            if (hook == null){
+                return (content: string)=> Promise.resolve(content);
+            }
+            return (content: string)=>{
+                // apply i-th hook
+                const p = Promise.resolve(hook(this, content, target, original));
+                return p.then(h(i+1));
+            };
+        };
+
+        return h(0)(content);
     }
 }
 
@@ -299,34 +371,18 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
 namespace renderUtil{
     // expressのあれに対応したrendererを作る
     export function makeExpressRenderer(ctx: RenderContext, func: ExpressFriendlyRenderFunction): RenderFunction{
-        return (file: string, outDir: string, options?: any)=> new Promise((resolve, reject)=>{
-            // ファイルの更新日時チェック
-            fs.stat(file, (err, st)=>{
-                if (err != null){
-                    reject(err);
-                    return;
-                }
-                const mtime = st.mtime.getTime();
-                const saveFile = ctx.getTargetFile(file, outDir);
-                // htmlファイルのなまえ
-                resolve(ctx.needsRender(saveFile, mtime).then(b=>{
-                    if (!b){
-                        log.verbose('expressRenderer', 'skipped %s', file);
-                        return;
+        return (file: string, outDir: string, options?: any)=>{
+            const target = ctx.getTargetFile(file, outDir);
+            return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
+                func(file, options, (err, html)=>{
+                    if (err != null){
+                        reject(err);
                     }else{
-                        return new Promise((resolve, reject)=>{
-                            func(file, options, (err, html)=>{
-                                if (err != null){
-                                    reject(err);
-                                    return;
-                                }
-                                resolve(mkdirpsave(ctx, saveFile, html));
-                            });
-                        });
+                        resolve(html);
                     }
-                }));
-            });
-        });
+                });
+            }));
+        };
     }
     // dustjsのrendererを作る
     export function makeDustjsRenderer(ctx: RenderContext): RenderFunction {
@@ -339,132 +395,80 @@ namespace renderUtil{
         } = ctx;
 
         return (file: string, outDir: string, options?: any)=>{
-            return new Promise((resolve, reject)=>{
-                fs.stat(file, (err, st)=>{
+            const target = ctx.getTargetFile(file, outDir);
+            return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
+                fs.readFile(file, (err, buf)=>{
                     if (err != null){
                         reject(err);
                         return;
                     }
-                    const mtime = st.mtime.getTime();
-                    const saveFile = ctx.getTargetFile(file, outDir);
-
-                    resolve(ctx.needsRender(saveFile, mtime).then(b=>{
-                        if (!b){
-                            log.verbose('dustjsRenderer', 'skipped %s', file);
+                    // onload hook
+                    dust.onLoad = (templatepath: string, callback: (err: any, content: string)=>void)=>{
+                        // dust用の便利なあれ
+                        const tp = templatepath.replace(/\$(\w+)(?!\w)/g, (al: string, name: string)=>{
+                            switch (name.toLowerCase()){
+                                case 'proj':
+                                    return projdir;
+                                case 'root':
+                                    return settings.rootDir;
+                                default:
+                                    return al;
+                            }
+                        });
+                        fs.readFile(path.resolve(path.dirname(file), tp), 'utf8', callback);
+                    };
+                    const t = dust.compile(buf.toString(), path);
+                    dust.loadSource(t);
+                    dust.render(file, options, (err, html)=>{
+                        if (err != null){
+                            reject(err);
                             return;
-                        }else{
-                            return new Promise((resolve, reject)=>{
-                                fs.readFile(file, (err, buf)=>{
-                                    if (err != null){
-                                        reject(err);
-                                        return;
-                                    }
-                                    // onload hook
-                                    dust.onLoad = (templatepath: string, callback: (err: any, content: string)=>void)=>{
-                                        // dust用の便利なあれ
-                                        const tp = templatepath.replace(/\$(\w+)(?!\w)/g, (al: string, name: string)=>{
-                                            switch (name.toLowerCase()){
-                                                case 'proj':
-                                                    return projdir;
-                                                case 'root':
-                                                    return settings.rootDir;
-                                                default:
-                                                    return al;
-                                            }
-                                        });
-                                        fs.readFile(path.resolve(path.dirname(file), tp), 'utf8', callback);
-                                    };
-                                    const t = dust.compile(buf.toString(), path);
-                                    dust.loadSource(t);
-                                    dust.render(file, options, (err, html)=>{
-                                        if (err != null){
-                                            reject(err);
-                                            return;
-                                        }
-                                        resolve(mkdirpsave(ctx, saveFile, html));
-                                    });
-                                });
-                            });
                         }
-                    }));
+                        resolve(html);
+                    });
                 });
-            });
+            }));
         };
     }
     // 静的ファイルのrendererを作る
     export function makeStaticRenderer(ctx: RenderContext): RenderFunction {
         return (file: string, outDir: string)=>{
-            return new Promise((resolve, reject)=>{
-                const base = path.basename(file);
-                const target = path.join(outDir, base);
+            const base = path.basename(file);
+            const target = path.join(outDir, base);
 
-                fs.stat(file, (err, st)=>{
+            return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
+                fs.readFile(file, (err, buf)=>{
                     if (err != null){
                         reject(err);
                         return;
                     }
-                    const mtime = st.mtime.getTime();
-
-                    resolve(ctx.needsRender(target, mtime).then(b=>{
-                        if (!b){
-                            log.verbose('staticRenderer', 'skipped %s', file);
-                            return;
-                        }else{
-                             return new Promise((resolve, reject)=>{
-                                 fs.readFile(file, (err, buf)=>{
-                                     if (err != null){
-                                         reject(err);
-                                         return;
-                                     }
-                                     resolve(mkdirpsave(ctx, target, buf.toString()));
-                                 });
-                             });
-                        }
-                    }));
+                    resolve(buf.toString());
                 });
-            });
+            }));
         };
     }
     // sass
     export function makeSassRenderer(ctx: RenderContext): RenderFunction {
-        const sass = ctx.localRequire('node-sass');
         return (file: string, outDir: string)=>{
-            return new Promise((resolve, reject)=>{
+            const target = ctx.getTargetFile(file, outDir, '.css');
+            return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
+                const sass = ctx.localRequire('node-sass');
                 if (sass == null){
                     log.verbose('sassRenderer', 'skipped %s : node-sass does not exist', file);
-                    resolve();
+                    resolve(null);
                     return;
                 }
-                fs.stat(file, (err, st)=>{
+                sass.render({
+                    file,
+                }, (err, result)=>{
                     if (err != null){
+                        log.error('Error rendering %s: [ %s ]', file, err);
                         reject(err);
                         return;
                     }
-                    const mtime = st.mtime.getTime();
-                    const ext = path.extname(file);
-                    const base = path.basename(file, ext);
-                    const saveFile = path.join(outDir, base + '.css');
-                    resolve(ctx.needsRender(saveFile, mtime).then(b=>{
-                        if (!b){
-                            log.verbose('sassRenderer', 'skipped %s', file);
-                            return;
-                        }else{
-                            return new Promise((resolve, reject)=>{
-                                sass.render({
-                                    file,
-                                }, (err, result)=>{
-                                    if (err != null){
-                                        log.error('Error rendering %s: [ %s ]', file, err);
-                                        reject(err);
-                                        return;
-                                    }
-                                    resolve(mkdirpsave(ctx, saveFile, result.css));
-                                });
-                            });
-                        }
-                    }));
+                    resolve(result.css);
                 });
-            });
+            }));
         };
     }
 
