@@ -154,6 +154,43 @@ export class RenderContext{
             }
         });
     }
+    // load extensions
+    public loadExtensions(): Promise<any>{
+        const {
+            projdir,
+            settings,
+        } = this;
+        const {
+            extension,
+        } = settings;
+
+        const exts: Array<string> = Array.isArray(extension) ? extension : 'string'===typeof extension ? [extension] : [];
+
+        if (exts.length > 0){
+            log.verbose('loadExtensions', 'Loading extensions');
+        }
+        const h = (i: number)=>{
+            const jsp = exts[i];
+            if (jsp == null){
+                log.verbose('loadExtensions', 'Loaded extensions');
+                return Promise.resolve();
+            }
+            const absp = path.resolve(projdir, jsp);
+            try {
+                const obj = require(absp);
+                if ('function' !== typeof obj){
+                    log.error('Extension must be a function: %s', absp);
+                    return Promise.reject(new Error('Extension must be a function'));
+                }
+                return Promise.resolve(obj(this)).then(()=> h(i+1));
+            }catch (e){
+                log.error('Error loading %s:', absp);
+                log.error('[ %s ]', e);
+                return Promise.reject(e);
+            }
+        };
+        return h(0);
+    }
     // ====================
     // add hooks
     public addPostRenderHook(func: PostRenderHook): void{

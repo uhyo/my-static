@@ -91,7 +91,7 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
     log.verbose('makeContext', 'outDir: %s', settings.outDir);
     // make context.
     const ctx = new RenderContext(projdir, settings);
-    return Promise.all([ctx.loadData(), ctx.readDependency()]).then(()=> ctx);
+    return Promise.all([ctx.loadData(), ctx.readDependency()]).then(()=> ctx.loadExtensions()).then(()=> ctx);
 }
 
 // Build files.

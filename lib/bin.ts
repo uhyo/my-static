@@ -38,12 +38,16 @@ cli.main((args, options)=>{
         project: options.project,
         outDir: options.outDir,
         watch: !!options.watch,
+        force: !!options.force,
         target: args.length > 0 ? args : null,
     }).then(()=>{
         log.info('Build done.');
     }).catch(e=>{
         if (e){
             log.error(e);
+            if (e.stack){
+                console.error(e.stack);
+            }
         }
         process.exit(1);
     });

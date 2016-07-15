@@ -105,6 +105,7 @@ describe('Render File', ()=>{
         cache: null,
         dependency: null,
         target: null,
+        extension: null,
     };
     let ctx;
     const mtime = new Date();

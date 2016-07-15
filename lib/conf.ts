@@ -42,6 +42,8 @@ export interface ProjectSettings{
     dependency: string | Array<string>;
     // render対象ファイル
     target: Array<string>;
+    // Contextに追加するやつ
+    extension: string | Array<string>;
 }
 
 // BuildOptionsにデフォルト設定を書き込む
@@ -66,7 +68,7 @@ export function overwriteSettings(options: BuildOptions, settings: ProjectSettin
     }else if (!settings.outExt){
         settings.outExt = DEFAULT_OUT_EXT;
     }
-    if (options.force){
+    if (options.force != null){
         settings.force = options.force;
     }
     if (Array.isArray(options.target)){
