@@ -111,13 +111,17 @@ export class RenderContext{
             projdir,
             settings,
         } = this;
+        const {
+            force,
+        } = settings;
+
         if ('string' !== typeof settings.data){
             log.verbose('makeContext', 'data directory is not specified.');
             this.data = {};
             return Promise.resolve();
         }
         const datadir = path.resolve(projdir, settings.data);
-        const cachefile = 'string' === typeof settings.cache ? path.resolve(projdir, settings.cache) : null;
+        const cachefile = !force && ('string' === typeof settings.cache) ? path.resolve(projdir, settings.cache) : null;
 
         log.verbose('loadData', 'datadir: %s', datadir);
         if (cachefile != null && this.data == null){
@@ -165,6 +169,35 @@ export class RenderContext{
     // do stuff around rendering
     public render(original: string, target: string, renderer: ()=>(string | Promise<string>)): Promise<any>{
         return new Promise((resolve, reject)=>{
+            const doRender = ()=>{
+                // request a render.
+                const p = Promise.resolve(renderer());
+                const p2 = p.then(content=>new Promise((resolve, reject)=>{
+                    if (content == null){
+                        // ???
+                        log.verbose('render', 'Skipped rendering %s: due to null content', target);
+                        resolve();
+                        return;
+                    }
+                    // apply postRenderHooks here.
+                    this.applyPostRenderHooks(content, target, original).then(content=>{
+                        // save to the target file.
+                        const dir = path.dirname(target);
+                        mkdirp(dir, err=>{
+                            if (err != null){
+                                reject(err);
+                            }
+                            resolve(this.saveFile(target, content));
+                        });
+                    });
+                }));
+                resolve(p2);
+            };
+            if (this.settings.force){
+                // no need to check mtime
+                doRender();
+                return;
+            }
             // stat original file and target file.
             fs.stat(original, (err, st)=>{
                 if (err != null){
@@ -185,37 +218,16 @@ export class RenderContext{
                     // mtimeを比較してrerenderするか決定
                     if (target_mtime >= data_mtime){
                         // No need to rerender
-                        log.verbose('render', 'Skipped rendering %s: non need to rerender', original);
+                        log.verbose('render', 'Skipped rendering %s: no need to rerender', original);
                         resolve();
                         return;
                     }
-                    // request a render.
-                    const p = Promise.resolve(renderer());
-                    const p2 = p.then(content=>new Promise((resolve, reject)=>{
-                        if (content == null){
-                            // ???
-                            log.verbose('render', 'Skipped rendering %s: due to null content', target);
-                            resolve();
-                            return;
-                        }
-                        // apply postRenderHooks here.
-                        this.applyPostRenderHooks(content, target, original).then(content=>{
-                            // save to the target file.
-                            const dir = path.dirname(target);
-                            mkdirp(dir, err=>{
-                                if (err != null){
-                                    reject(err);
-                                }
-                                resolve(this.saveFile(target, content));
-                            });
-                        });
-                    }));
-                    resolve(p2);
+                    doRender();
                 });
             });
         });
     }
-    //----- util for render.
+    // ----- util for render.
     // このファイルはrerenderが必要か
     // target: 書き込み対象ファイル名
     // mtime: 元のファイルのmtime

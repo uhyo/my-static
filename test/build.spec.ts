@@ -337,6 +337,37 @@ block content
             }).catch(done.fail);
         });
     });
+    describe('force', ()=>{
+        it('all re-rendering', done=>{
+            const projDir = path.join(mnt, 'proj3');
+            const outDir = path.join(mnt, 'out-proj3');
+            build({
+                cwd: projDir,
+                force: true,
+            }).then(()=>{
+                expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html', 'a.js'].sort());
+                expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+                expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>ぬ\u3099</p>');
+                expect(fs.readFileSync(path.join(outDir, 'a.js'), 'utf8')).toBe('while(1){}');
+                done();
+            }).catch(done.fail);
+        });
+        it('do not use cache', done=>{
+            const projDir = path.join(mnt, 'proj1');
+            const outDir = path.join(mnt, 'out');
+            build({
+                cwd: projDir,
+                project: 'myst-cache.json',
+                force: true,
+            }).then(()=>{
+                expect(fs.readdirSync(outDir).sort()).toEqual(['index.html', 'foo.html'].sort());
+                expect(fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')).toBe('<p>pow!</p>');
+                // cache is used
+                expect(fs.readFileSync(path.join(outDir, 'foo.html'), 'utf8')).toBe('<p>吉野家にようこそ！</p>');
+                done();
+            }).catch(done.fail);
+        });
+    });
     describe('dependency', ()=>{
         it('see dependency', done=>{
             const projDir = path.join(mnt, 'proj4');

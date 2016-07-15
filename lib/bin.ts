@@ -20,6 +20,7 @@ cli.parse({
     project: ['p', 'Project file', 'path'],
     outDir: ['o', 'Output directory', 'path'],
     watch: ['w', 'Watch'],
+    force: ['f', 'Force all files to be re-rendered'],
     // logs
     quiet: ['q', 'Quiet logs'],
     verbose: [null, 'Verbose logs'],

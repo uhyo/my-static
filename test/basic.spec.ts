@@ -97,6 +97,7 @@ describe('Render File', ()=>{
         foo: 3,
     };
     const settings = {
+        force: false,
         rootDir: projdir,
         outDir,
         outExt: '.html',

@@ -13,6 +13,10 @@ export interface BuildOptions{
     project?: string;
     // enable watching
     watch?: boolean;
+
+    // ========== overwriting ProjectSettings ==========
+    // force all files to be re-rendered
+    force?: boolean;
     // root directory of page files
     rootDir?: string;
     // output directory
@@ -28,6 +32,8 @@ export interface ProjectSettings{
     rootDir: string;
     outDir: string;
     outExt: string;
+    // force rerendering
+    force: boolean;
     // dataディレクトリがある場所
     data: string;
     // cacheファイルの場所
@@ -59,6 +65,9 @@ export function overwriteSettings(options: BuildOptions, settings: ProjectSettin
         settings.outExt = options.outExt;
     }else if (!settings.outExt){
         settings.outExt = DEFAULT_OUT_EXT;
+    }
+    if (options.force){
+        settings.force = options.force;
     }
     if (Array.isArray(options.target)){
         // build targetはcwdからあれしてると思う
