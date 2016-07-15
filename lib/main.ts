@@ -3,6 +3,7 @@
 import {
     BuildOptions,
     ProjectSettings,
+    FoundProject,
     defaultBuildOptions,
     overwriteSettings,
 } from './conf';
@@ -14,6 +15,9 @@ import {
 import {
     watchProject,
 } from './watch';
+import {
+    startServer,
+} from './server';
 import {
     loadData,
     getMTime,
@@ -27,11 +31,6 @@ const findUp = require('find-up');
 const watch = require('watch');
 const mld = require('my-load-data');
 
-interface FoundProject{
-    projdir: string;
-    options: BuildOptions;
-    settings: ProjectSettings;
-}
 // Find project.
 export function findProject(options: BuildOptions): Promise<FoundProject>{
     const {
@@ -60,8 +59,8 @@ export function findProject(options: BuildOptions): Promise<FoundProject>{
         });
     });
 }
-// read data.
-export function makeContext({projdir, options, settings}: FoundProject): Promise<RenderContext>{
+// sanitize settings.
+export function sanitize({projdir, options, settings}: FoundProject): Promise<FoundProject>{
     settings = overwriteSettings(options, settings);
     if (settings.rootDir){
         settings.rootDir = path.resolve(projdir, settings.rootDir);
@@ -79,8 +78,8 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
         // デフォルトは全部
         settings.target = [path.join(settings.rootDir, '*')];
     }
-    log.verbose('makeContext', 'rootDir: %s', settings.rootDir);
-    log.verbose('makeContext', 'target: %s', settings.target.join(', '));
+    log.verbose('sanitize', 'rootDir: %s', settings.rootDir);
+    log.verbose('sanitize', 'target: %s', settings.target.join(', '));
     if (settings.outDir){
         settings.outDir = path.resolve(projdir, settings.outDir);
     }
@@ -88,7 +87,15 @@ export function makeContext({projdir, options, settings}: FoundProject): Promise
         log.error('outDir is not provided');
         return Promise.reject(new Error('outDir is not provided'));
     }
-    log.verbose('makeContext', 'outDir: %s', settings.outDir);
+    log.verbose('sanitize', 'outDir: %s', settings.outDir);
+    return Promise.resolve({
+        projdir,
+        options,
+        settings,
+    });
+}
+// read data.
+export function makeContext({projdir, options, settings}: FoundProject): Promise<RenderContext>{
     // make context.
     const ctx = new RenderContext(projdir, settings);
     return Promise.all([ctx.loadData(), ctx.readDependency()]).then(()=> ctx.loadExtensions()).then(()=> ctx);
@@ -106,7 +113,9 @@ export function render(context: RenderContext): Promise<any>{
         target,
     } = settings;
     // rootDirが相対パスかもしれないので
-    return renderGlob(context, target);
+    return renderGlob(context, target).then(()=>{
+        log.info('Build done.');
+    });
 }
 
 // Watch.
@@ -166,6 +175,29 @@ export function watchToRender(context: RenderContext): any{
 export function build(options: BuildOptions = {}): Promise<any>{
     defaultBuildOptions(options);
 
-    const action = options.watch ? (context=>render(context).then(()=>watchToRender(context))) : render;
-    return findProject(options).then(makeContext).then(action);
+    // Find Project.
+    return findProject(options).then(sanitize).then((fp: FoundProject)=>{
+        const {
+            projdir,
+            options,
+            settings,
+        } = fp;
+        // naxt work?
+        const ps = [];
+        if (options.build || options.watch){
+            // load context and...
+            const p1 = makeContext(fp).then(context=>{
+                // build and/or watch
+                const p2 = options.build ? render(context) : Promise.resolve();
+                const p3 = options.watch ? p2.then(watchToRender(context)) : p2;
+                return p3;
+            });
+            ps.push(p1);
+        }
+        if (options.server){
+            // enable server
+            ps.push(startServer(fp));
+        }
+        return Promise.all(ps);
+    });
 }
