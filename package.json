@@ -1,6 +1,6 @@
 {
   "name": "my-static",
-  "version": "1.0.0",
+  "version": "1.0.0+a",
   "description": "My static website generator for me.",
   "main": "index.js",
   "bin": {
