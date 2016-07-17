@@ -4,7 +4,8 @@
   "description": "My static website generator for me.",
   "main": "index.js",
   "bin": {
-    "myst": "./bin/myst.js"
+    "myst": "./bin/myst.js",
+    "my-static": "./bin/myst.js"
   },
   "engines": {
     "node": ">=4.0.0"

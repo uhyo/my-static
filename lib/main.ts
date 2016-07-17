@@ -76,7 +76,7 @@ export function sanitize({projdir, options, settings}: FoundProject): Promise<Fo
         settings.target = settings.target.map(p=> path.resolve(projdir, p));
     }else{
         // デフォルトは全部
-        settings.target = [path.join(settings.rootDir, '*')];
+        settings.target = [path.join(settings.rootDir, '**', '*')];
     }
     log.verbose('sanitize', 'rootDir: %s', settings.rootDir);
     log.verbose('sanitize', 'target: %s', settings.target.join(', '));
@@ -135,6 +135,7 @@ export function watchToRender(context: RenderContext): any{
                 rendering = true;
                 // ビルド対象ファイルがアップデートしたのでそれだけ更新
                 log.info('Target file is updated. Rerendering...');
+                log.verbose('watchToRender', 'Updated file: %s', f);
                 renderFiles(context, [f]).then(()=>{
                     log.info('Rendering done.');
                 }).catch(e=>log.error(e)).then(()=>{
@@ -150,6 +151,7 @@ export function watchToRender(context: RenderContext): any{
             if (rendering === false){
                 rendering = true;
                 log.info('Dependency directory is updated. Rerendering...');
+                log.verbose('watchToRender', 'Updated file: %s', f);
                 context.loadData().then(()=>render(context)).then(()=>{
                     log.info('Rendering done.');
                 }).catch(e=>log.error(e)).then(()=>{

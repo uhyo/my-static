@@ -324,7 +324,9 @@ export function renderGlob(context: RenderContext, pattern: Array<string>): Prom
             outDir,
         },
     } = context;
-    return globby(pattern).then(files=>renderFiles(context, files));
+    return globby(pattern, {
+        nodir: true,
+    }).then(files=>renderFiles(context, files));
 }
 // ファイルから書き込み対象フォルダも探す
 export function renderFiles(context: RenderContext, files: Array<string>): Promise<any>{
@@ -436,6 +438,8 @@ namespace renderUtil{
     // dustjsのrendererを作る
     export function makeDustjsRenderer(ctx: RenderContext): RenderFunction {
         const dust = ctx.localRequire('dustjs-linkedin');
+        dust.config.whitespace = true;
+        dust.config.cache = false;
         ctx.localRequire('dustjs-helpers');
 
         const {
@@ -466,7 +470,7 @@ namespace renderUtil{
                         });
                         fs.readFile(path.resolve(path.dirname(file), tp), 'utf8', callback);
                     };
-                    const t = dust.compile(buf.toString(), path);
+                    const t = dust.compile(buf.toString(), file);
                     dust.loadSource(t);
                     dust.render(file, options, (err, html)=>{
                         if (err != null){

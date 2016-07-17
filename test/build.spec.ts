@@ -408,8 +408,7 @@ describe('dustjs feature', ()=>{
                     'main.dust': `<div>foo {+body}body{/body} bar</div>`,
                 },
                 'src': {
-                    'index.dust': `{>"$PROJ/layout/main.dust"/}
-{<body}aiu{/body}`,
+                    'index.dust': `{>"$PROJ/layout/main.dust"/}{<body}aiu{/body}`,
                     'index2.dust': `{>"$ROOT/../layout/main.dust"/}`,
                 },
             },

@@ -37,7 +37,6 @@ cli.main((args, options)=>{
     if (options.verbose){
         log.setLogLevel(log.LogLevel.verbose);
     }
-    console.log(options);
 
     build({
         project: options.project,
