@@ -9,7 +9,7 @@ $ npm install -g my-static
 ## Usage
 Prepare your project including template files, data files, and `myst.json`.
 
-Sample project: (TODO)
+Sample project: https://github.com/uhyo/myst-doc
 
 Then run at the project directory:
 ```sh
@@ -27,7 +27,7 @@ Minimal `myst.json` has following fields. For paths, relative and absolute paths
 }
 ```
 
-For more information, see (TODO).
+For more information, see [myst-doc](https://uhyo.github.com/myst-doc/).
 
 
 ## License
