@@ -42,15 +42,15 @@ export interface ProjectSettings{
     // force rerendering
     force: boolean;
     // dataディレクトリがある場所
-    data: string;
+    data?: string;
     // cacheファイルの場所
-    cache: string;
+    cache?: string;
     // 依存ファイルの一覧
-    dependency: string | Array<string>;
+    dependency?: string | Array<string>;
     // render対象ファイル
-    target: Array<string>;
+    target?: Array<string>;
     // Contextに追加するやつ
-    extension: string | Array<string>;
+    extension?: string | Array<string>;
 
     // options for server
     server?: {

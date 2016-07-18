@@ -113,7 +113,7 @@ export function render(context: RenderContext): Promise<any>{
         target,
     } = settings;
     // rootDirが相対パスかもしれないので
-    return renderGlob(context, target).then(()=>{
+    return renderGlob(context, target || []).then(()=>{
         log.info('Build done.');
     });
 }
@@ -185,7 +185,7 @@ export function build(options: BuildOptions = {}): Promise<any>{
             settings,
         } = fp;
         // naxt work?
-        const ps = [];
+        const ps: Array<Promise<any>> = [];
         if (options.build || options.watch){
             // load context and...
             const p1 = makeContext(fp).then(context=>{

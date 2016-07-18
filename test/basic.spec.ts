@@ -101,11 +101,6 @@ describe('Render File', ()=>{
         rootDir: projdir,
         outDir,
         outExt: '.html',
-        data: null,
-        cache: null,
-        dependency: null,
-        target: null,
-        extension: null,
     };
     let ctx;
     const mtime = new Date();

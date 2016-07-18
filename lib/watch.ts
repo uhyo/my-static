@@ -79,9 +79,9 @@ export function watchProject(ctx: RenderContext): Promise<EventEmitter>{
         const rootDir = path.resolve(projdir, settings.rootDir);
         watch.createMonitor(rootDir, {
             ignoreDotFiles: true,
-            filter: (file: string)=>{
+            filter: target ? (file: string)=>{
                 return target.some(p=> minimatch(file, p));
-            },
+            } : null,
         }, f);
         allcnt++;
 

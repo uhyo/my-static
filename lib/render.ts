@@ -1,6 +1,6 @@
 /// <reference path='../typings/bundle.d.ts' />
 // render directory.
-//
+
 import {
     ProjectSettings,
 } from './conf';
@@ -21,7 +21,7 @@ export interface ExpressFriendlyRenderFunction{
     (path: string, options: any, callback: any): void;
 }
 export interface RenderFunction{
-    (path: string, outDir: string, options?: any): Promise<any>;
+    (path: string, outDir: string, options?: any): Promise<null | any>;
 }
 
 // Hooks
@@ -45,7 +45,7 @@ export class RenderContext{
         this.settings = settings;
     }
     // 拡張子に対応するrendererを読み込む
-    public getRenderer(filepath: string): RenderFunction {
+    public getRenderer(filepath: string): RenderFunction | null{
         const {
             renderers,
         } = this;
@@ -169,7 +169,8 @@ export class RenderContext{
         if (exts.length > 0){
             log.verbose('loadExtensions', 'Loading extensions');
         }
-        const h = (i: number)=>{
+        let h: (i: number)=>Promise<any>;
+        h = (i: number)=>{
             const jsp = exts[i];
             if (jsp == null){
                 log.verbose('loadExtensions', 'Loaded extensions');
@@ -182,7 +183,7 @@ export class RenderContext{
                     log.error('Extension must be a function: %s', absp);
                     return Promise.reject(new Error('Extension must be a function'));
                 }
-                return Promise.resolve(obj(this)).then(()=> h(i+1));
+                return Promise.resolve(obj(this)).then(()=> h!(i+1));
             }catch (e){
                 log.error('Error loading %s:', absp);
                 log.error('[ %s ]', e);
@@ -204,7 +205,7 @@ export class RenderContext{
         return path.join(outDir, base + outExt);
     }
     // do stuff around rendering
-    public render(original: string, target: string, renderer: ()=>(string | Promise<string>)): Promise<any>{
+    public render(original: string, target: string, renderer: ()=>(null | string | Promise<null | string>)): Promise<any>{
         return new Promise((resolve, reject)=>{
             const doRender = ()=>{
                 // request a render.
@@ -301,7 +302,8 @@ export class RenderContext{
         });
     }
     private applyPostRenderHooks(content: string, target: string, original: string): Promise<string>{
-        const h = (i: number)=>{
+        let h: (i: number)=>(content: string)=>Promise<string>;
+        h = (i: number)=>{
             const hook = this.postRenderHooks[i];
             if (hook == null){
                 return (content: string)=> Promise.resolve(content);
@@ -336,7 +338,10 @@ export function renderFiles(context: RenderContext, files: Array<string>): Promi
             outDir,
         },
     } = context;
-    const files2 = [];
+    const files2: Array<{
+        file: string;
+        outDir: string;
+    }> = [];
     for (let f of files){
         const r = path.relative(rootDir, f);
         if (r.split(path.sep, 1)[0] === '..'){
@@ -358,7 +363,8 @@ function renderFilesAt(context: RenderContext, files: Array<{
     outDir: string;
 }>): Promise<any>{
     // 複数ファイルをsequentialにrenderする
-    const h = (i: number)=>{
+    let h: (i: number)=>Promise<any>;
+    h = (i: number)=>{
         const f = files[i];
         if (f == null){
             return Promise.resolve();
@@ -504,7 +510,7 @@ namespace renderUtil{
     export function makeSassRenderer(ctx: RenderContext): RenderFunction {
         return (file: string, outDir: string)=>{
             const target = ctx.getTargetFile(file, outDir, '.css');
-            return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
+            return ctx.render(file, target, ()=>new Promise<null | string>((resolve, reject)=>{
                 const sass = ctx.localRequire('node-sass');
                 if (sass == null){
                     log.verbose('sassRenderer', 'skipped %s : node-sass does not exist', file);
