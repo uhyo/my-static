@@ -453,7 +453,7 @@ namespace renderUtil{
             settings,
         } = ctx;
 
-        return (file: string, outDir: string, options?: any)=>{
+        const result: RenderFunction = (file: string, outDir: string, options?: any)=>{
             const target = ctx.getTargetFile(file, outDir);
             return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
                 fs.readFile(file, (err, buf)=>{
@@ -488,6 +488,10 @@ namespace renderUtil{
                 });
             }));
         };
+
+        // dustをくっつける (for extension)
+        (result as any).dust = dust;
+        return result;
     }
     // 静的ファイルのrendererを作る
     export function makeStaticRenderer(ctx: RenderContext): RenderFunction {
