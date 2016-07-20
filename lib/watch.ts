@@ -5,7 +5,7 @@ import {
 } from 'events';
 const path = require('path');
 
-const watch = require('watch');
+const gaze = require('gaze');
 const minimatch = require('minimatch');
 
 import {
@@ -27,30 +27,30 @@ export function watchProject(ctx: RenderContext): Promise<EventEmitter>{
         // いくつかの場所をwatch
         let cnt = 0;
         let allcnt = 0;
-        const f = (monitor)=>{
-            monitor.on('created', (f, stat)=>{
-                e.emit('updated', f, stat);
+        const f = (watcher)=>{
+            watcher.on('added', f=>{
+                e.emit('updated', f);
             });
-            monitor.on('removed', (f, stat)=>{
-                e.emit('removed', f, stat);
+            watcher.on('deleted', f=>{
+                e.emit('removed', f);
             });
-            monitor.on('changed', (f, curr, prev)=>{
-                e.emit('updated', f, curr, prev);
+            watcher.on('changed', f=>{
+                e.emit('updated', f);
             });
 
             if (++cnt >= allcnt){
                 resolve(e);
             }
         };
-        const fd = (monitor)=>{
+        const fd = (watcher)=>{
             // データ用
-            monitor.on('created', (f, stat)=>{
+            watcher.on('added', f=>{
                 e.emit('data-updated', f);
             });
-            monitor.on('removed', (f, stat)=>{
+            watcher.on('deleted', f=>{
                 e.emit('data-updated', f);
             });
-            monitor.on('changed', (f, curr, prev)=>{
+            watcher.on('changed', f=>{
                 e.emit('data-updated', f);
             });
 
@@ -58,15 +58,15 @@ export function watchProject(ctx: RenderContext): Promise<EventEmitter>{
                 resolve(e);
             }
         };
-        const fdp = (monitor)=>{
+        const fdp = (watcher)=>{
             // dependency用
-            monitor.on('created', (f, stat)=>{
+            watcher.on('added', f=>{
                 e.emit('dep-updated', f);
             });
-            monitor.on('removed', (f, stat)=>{
+            watcher.on('deleted', f=>{
                 e.emit('dep-updated', f);
             });
-            monitor.on('changed', (f, curr, prev)=>{
+            watcher.on('changed', f=>{
                 e.emit('dep-updated', f);
             });
 
@@ -77,32 +77,49 @@ export function watchProject(ctx: RenderContext): Promise<EventEmitter>{
 
         // build対象ファイルをwatch
         const rootDir = path.resolve(projdir, settings.rootDir);
-        watch.createMonitor(rootDir, {
-            ignoreDotFiles: true,
-            filter: target ? (file: string)=>{
-                return target.some(p=> minimatch(file, p));
-            } : null,
-        }, f);
+        const targetRel = target ? target.map(pat=> path.relative(rootDir, pat)) : [];
+        gaze(targetRel, {
+            cwd: rootDir,
+        }, (err, watcher)=>{
+            if (err){
+                allcnt = Infinity;
+                reject(err);
+                return;
+            }
+            f(watcher);
+        });
         allcnt++;
 
         // データディレクトリをwatch
         if (data){
-            watch.createMonitor(data, {
-                ignoreDotFiles: true,
-            }, fd);
+            gaze('**/*', {
+                cwd: data,
+            }, (err, watcher)=>{
+                if (err){
+                    allcnt = Infinity;
+                    reject(err);
+                    return;
+                }
+                fd(watcher);
+            });
             allcnt++;
         }
 
         // dependency
         if (dependency){
             const dependency_a = Array.isArray(dependency) ? dependency : dependency ? [dependency] : [];
-            const dependency_aa = dependency_a.map(p=>path.resolve(projdir, p));
-            for (let d of dependency_aa){
-                watch.createMonitor(d, {
-                    ignoreDotFiles: true,
-                }, fdp);
-                allcnt++;
-            }
+            const dependency_aa = dependency_a.map(p=>path.join(p, '**/*'));
+            gaze(dependency_aa, {
+                cwd: projdir,
+            }, (err, watcher)=>{
+                if (err){
+                    allcnt = Infinity;
+                    reject(err);
+                    return;
+                }
+                fdp(watcher);
+            });
+            allcnt++;
         }
     });
 }

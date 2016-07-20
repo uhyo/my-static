@@ -28,7 +28,6 @@ import * as log from './log';
 const path = require('path');
 
 const findUp = require('find-up');
-const watch = require('watch');
 const mld = require('my-load-data');
 
 // Find project.

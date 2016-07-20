@@ -59,11 +59,11 @@
     "es6-promise": "^3.2.1",
     "express": "^4.14.0",
     "find-up": "^1.1.2",
+    "gaze": "^1.1.0",
     "globby": "^5.0.0",
     "jade": "^1.11.0",
     "minimatch": "^3.0.2",
     "my-load-data": "^1.1.0-rc1",
-    "resolve": "^1.1.7",
-    "watch": "^0.19.1"
+    "resolve": "^1.1.7"
   }
 }
