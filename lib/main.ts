@@ -127,6 +127,12 @@ export function watchToRender(context: RenderContext): any{
                 data,
             },
         } = context;
+        const reportErr = (e)=>{
+            log.error(e);
+            if (e.stack){
+                console.error(e.stack);
+            }
+        };
         // Rendering flag.
         let rendering = false;
         monitor.on('updated', f=>{
@@ -137,7 +143,7 @@ export function watchToRender(context: RenderContext): any{
                 log.verbose('watchToRender', 'Updated file: %s', f);
                 renderFiles(context, [f]).then(()=>{
                     log.info('Rendering done.');
-                }).catch(e=>log.error(e)).then(()=>{
+                }).catch(reportErr).then(()=>{
                     rendering = false;
                 });
             }
@@ -153,7 +159,7 @@ export function watchToRender(context: RenderContext): any{
                 log.verbose('watchToRender', 'Updated file: %s', f);
                 context.loadData().then(()=>render(context)).then(()=>{
                     log.info('Rendering done.');
-                }).catch(e=>log.error(e)).then(()=>{
+                }).catch(reportErr).then(()=>{
                     rendering = false;
                 });
             }
@@ -164,7 +170,7 @@ export function watchToRender(context: RenderContext): any{
                 log.info('Dependency directory is updated. Rerendering...');
                 context.readDependency().then(()=>render(context)).then(()=>{
                     log.info('Rendering done.');
-                }).catch(e=>log.error(e)).then(()=>{
+                }).catch(reportErr).then(()=>{
                     rendering = false;
                 });
             }
