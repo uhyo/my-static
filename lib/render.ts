@@ -25,6 +25,11 @@ export interface RenderFunction{
 }
 
 // Hooks
+interface PreRenderHook{
+    (ctx: RenderContext, filename: string, data: any): {
+        data?: any;
+    } | null;
+}
 interface PostRenderHook{
     (ctx: RenderContext, content: string, target: string, original: string): any;
 }
@@ -38,6 +43,7 @@ export class RenderContext{
         [ext: string]: RenderFunction;
     } = {};
     // hooks
+    private preRenderHooks: Array<PreRenderHook> = [];
     private postRenderHooks: Array<PostRenderHook> = [];
 
     constructor(projdir: string, settings: ProjectSettings){
@@ -80,7 +86,13 @@ export class RenderContext{
             default:
                 return null;
         }
+    }
+    public addRenderer(ext: string, func: RenderFunction): void{
+        const {
+            renderers,
+        } = this;
 
+        renderers[ext] = func;
     }
     // require modules from local project is possible
     public localRequire(name: string): any{
@@ -194,6 +206,9 @@ export class RenderContext{
     }
     // ====================
     // add hooks
+    public addPreRenderHook(func: PreRenderHook): void{
+        this.preRenderHooks.push(func);
+    }
     public addPostRenderHook(func: PostRenderHook): void{
         this.postRenderHooks.push(func);
     }
@@ -203,6 +218,22 @@ export class RenderContext{
         const ext = path.extname(file);
         const base = path.basename(file, ext);
         return path.join(outDir, base + outExt);
+    }
+    // ファイルをrenderする用にdataを作る
+    public makeData(file: string, outDir: string): any{
+        let result = Object.assign({
+            FILENAME: file,
+        }, this.data);
+        // apply hooks
+        for (let f of this.preRenderHooks){
+            const obj = f(this, file, result);
+            if (obj != null){
+                if (obj.data != null){
+                    result = obj.data;
+                }
+            }
+        }
+        return result;
     }
     // do stuff around rendering
     public render(original: string, target: string, renderer: ()=>(null | string | Promise<null | string>)): Promise<any>{
@@ -418,7 +449,8 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
                     return;
                 }
                 log.verbose('renderFile', 'Rendering file %s', f);
-                resolve(r(f, outDir, context.data));
+                const data = context.makeData(f, outDir);
+                resolve(r(f, outDir, data));
             }
         });
     });

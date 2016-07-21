@@ -194,5 +194,18 @@ describe('Render File', ()=>{
                 done();
             }).catch(done.fail);
         });
+        it('pre-render hook', done=>{
+            ctx.addPreRenderHook((content, filename, data)=>{
+                return {
+                    data: Object.assign({}, data, {
+                        foo: '吉野家',
+                    }),
+                };
+            });
+            renderFile(ctx, path.join(ctx.projdir, 'foo.ejs'), outDir).then(()=>{
+                expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'foo.html'), '<p>cow!吉野家</p>');
+                done();
+            }).catch(done.fail);
+        });
     });
 });
