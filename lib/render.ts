@@ -25,6 +25,9 @@ export interface RenderFunction{
 }
 
 // Hooks
+interface PostLoadDataHook{
+    (ctx: RenderContext): void;
+}
 interface PreRenderHook{
     (ctx: RenderContext, filename: string, data: any): {
         data?: any;
@@ -43,6 +46,7 @@ export class RenderContext{
         [ext: string]: RenderFunction;
     } = {};
     // hooks
+    private postLoadDataHooks: Array<PostLoadDataHook> = [];
     private preRenderHooks: Array<PreRenderHook> = [];
     private postRenderHooks: Array<PostRenderHook> = [];
 
@@ -146,6 +150,11 @@ export class RenderContext{
                 this.basemtime = Math.max(datamtime, this.basemtime);
             }
             this.data = data || {};
+
+            // apply PostLoadDataHooks.
+            for (let f of this.postLoadDataHooks){
+                f(this);
+            }
         });
     }
     // read mtime of dependencies.
@@ -206,6 +215,9 @@ export class RenderContext{
     }
     // ====================
     // add hooks
+    public addPostLoadDataHook(func: PostLoadDataHook): void{
+        this.postLoadDataHooks.push(func);
+    }
     public addPreRenderHook(func: PreRenderHook): void{
         this.preRenderHooks.push(func);
     }

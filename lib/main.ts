@@ -97,7 +97,7 @@ export function sanitize({projdir, options, settings}: FoundProject): Promise<Fo
 export function makeContext({projdir, options, settings}: FoundProject): Promise<RenderContext>{
     // make context.
     const ctx = new RenderContext(projdir, settings);
-    return Promise.all([ctx.loadData(), ctx.readDependency()]).then(()=> ctx.loadExtensions()).then(()=> ctx);
+    return ctx.loadExtensions().then(()=> Promise.all([ctx.loadData(), ctx.readDependency()])).then(()=> ctx);
 }
 
 // Build files.
