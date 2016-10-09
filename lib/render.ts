@@ -39,6 +39,9 @@ interface PostRenderHook{
 interface UnknownExtensionHook{
     (ctx: RenderContext, ext: string): RenderFunction | null;
 }
+interface PostLoadFileHook{
+    (ctx: RenderContext, filename: string, content: string | Buffer): Promise<string | Buffer> | string | Buffer | null;
+}
 
 export class RenderContext{
     public projdir: string;
@@ -53,6 +56,7 @@ export class RenderContext{
     private preRenderHooks: Array<PreRenderHook> = [];
     private postRenderHooks: Array<PostRenderHook> = [];
     private unknownExtensionHooks: Array<UnknownExtensionHook> = [];
+    private postLoadFileHooks: Array<PostLoadFileHook> = [];
 
     constructor(projdir: string, settings: ProjectSettings){
         this.projdir = projdir;
@@ -240,6 +244,9 @@ export class RenderContext{
     public addUnknownExtensionHook(func: UnknownExtensionHook): void{
         this.unknownExtensionHooks.push(func);
     }
+    public addPostLoadFileHook(func: PostLoadFileHook): void{
+        this.postLoadFileHooks.push(func);
+    }
     // ====================
     // htmlファイル用に拡張子を付け替える
     public getTargetFile(file: string, outDir: string, outExt: string = this.settings.outExt): string{
@@ -264,7 +271,7 @@ export class RenderContext{
         return result;
     }
     // renderするべきファイルを読み込む
-    public loadRenderedFile(file: string, binary: boolean = false): Promise<any>{
+    public loadRenderedFile(file: string, binary: boolean = false): Promise<string | Buffer>{
         return new Promise((resolve, reject)=>{
             fs.readFile(file, {
                 encoding: binary ? null : 'utf8',
@@ -272,7 +279,19 @@ export class RenderContext{
                 if (err != null){
                     reject(err);
                 }else{
-                    resolve(data);
+                    // データにhooksをかます
+                    let p: Promise<string | Buffer> = Promise.resolve(data);
+                    for (let f of this.postLoadFileHooks){
+                        p = p.then(data=>{
+                           const p2 = f(this, file, data);
+                           if (p2 == null){
+                               return data;
+                           }else{
+                               return p2;
+                           }
+                        });
+                    }
+                    resolve(p);
                 }
             });
         });
@@ -528,7 +547,7 @@ export namespace renderUtil{
                             filename: file,
                         }, options);
                         if (needCallback){
-                            func(data, o, (err, html)=>{
+                            func(data as string, o, (err, html)=>{
                                 if (err != null){
                                     reject(err);
                                 }else{
@@ -536,7 +555,7 @@ export namespace renderUtil{
                                 }
                             });
                         }else{
-                            resolve(func(data, o));
+                            resolve(func(data as string, o));
                         }
                     });
                 });
@@ -558,35 +577,33 @@ export namespace renderUtil{
 
         const result: RenderFunction = (file: string, outDir: string, options?: any)=>{
             const target = ctx.getTargetFile(file, outDir);
-            return ctx.render(file, target, ()=>{
-                return ctx.loadRenderedFile(file, false)
-                .then(buf=> new Promise((resolve, reject)=>{
-                    // onload hook
-                    dust.onLoad = (templatepath: string, callback: (err: any, content: string)=>void)=>{
-                        // dust用の便利なあれ
-                        const tp = templatepath.replace(/\$(\w+)(?!\w)/g, (al: string, name: string)=>{
-                            switch (name.toLowerCase()){
-                                case 'proj':
-                                    return projdir;
-                                case 'root':
-                                    return settings.rootDir;
-                                default:
-                                    return al;
-                            }
-                        });
-                        fs.readFile(path.resolve(path.dirname(file), tp), 'utf8', callback);
-                    };
-                    const t = dust.compile(buf.toString(), file);
-                    dust.loadSource(t);
-                    dust.render(file, options, (err, html)=>{
-                        if (err != null){
-                            reject(err);
-                            return;
+            return ctx.render(file, target, ()=> new Promise((resolve, reject)=>{
+                // onload hook
+                dust.onLoad = (templatepath: string, callback: (err: any, content: string | null)=>void)=>{
+                    // dust用の便利なあれ
+                    const tp = templatepath.replace(/\$(\w+)(?!\w)/g, (al: string, name: string)=>{
+                        switch (name.toLowerCase()){
+                            case 'proj':
+                                return projdir;
+                            case 'root':
+                                return settings.rootDir;
+                            default:
+                                return al;
                         }
-                        resolve(html);
                     });
-                }));
-            });
+                    const abp = path.resolve(path.dirname(file), tp);
+                    ctx.loadRenderedFile(abp, false)
+                    .then(data=> callback(null, data as string))
+                    .catch(err=> callback(err, null));
+                };
+                dust.render(file, options, (err, html)=>{
+                    if (err != null){
+                        reject(err);
+                        return;
+                    }
+                    resolve(html);
+                });
+            }));
         };
 
         // dustをくっつける (for extension)
