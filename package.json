@@ -2,7 +2,7 @@
   "name": "my-static",
   "version": "1.0.0+a",
   "description": "My static website generator for me.",
-  "main": "index.js",
+  "main": "dist/lib/index.js",
   "bin": {
     "myst": "./bin/myst.js",
     "my-static": "./bin/myst.js"

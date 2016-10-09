@@ -7,6 +7,7 @@ import {
 import {
     RenderContext,
     renderFile,
+    renderUtil,
 } from '../lib/render';
 
 import {
@@ -135,6 +136,10 @@ describe('Render File', ()=>{
                     content: 'body {color: red;}',
                     mtime,
                 }),
+                'something.orz': mockFs.file({
+                    content: 'This is ORZ file!',
+                    mtime,
+                }),
             },
         });
         fs.mount(mnt, mock);
@@ -165,19 +170,19 @@ describe('Render File', ()=>{
     });
     it('html', done=>{
         renderFile(ctx, path.join(ctx.projdir, '吉野家.html'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, '吉野家.html'), '<table><tr><td>row!</td></tr></table>');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, '吉野家.html'), new Buffer('<table><tr><td>row!</td></tr></table>'));
             done();
         }).catch(done.fail);
     });
     it('js', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'a.js'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.js'), 'alert(1);');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.js'), new Buffer('alert(1);'));
             done();
         }).catch(done.fail);
     });
     it('css', done=>{
         renderFile(ctx, path.join(ctx.projdir, 'a.css'), outDir).then(html=>{
-            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.css'), 'body {color: red;}');
+            expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'a.css'), new Buffer('body {color: red;}'));
             done();
         }).catch(done.fail);
     });
@@ -204,6 +209,18 @@ describe('Render File', ()=>{
             });
             renderFile(ctx, path.join(ctx.projdir, 'foo.ejs'), outDir).then(()=>{
                 expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'foo.html'), '<p>cow!吉野家</p>');
+                done();
+            }).catch(done.fail);
+        });
+        it('unknown extension hook', done=>{
+            let flag: string | null = null;
+            ctx.addUnknownExtensionHook((context, ext)=>{
+                flag = ext;
+                return renderUtil.makeStaticRenderer(context);
+            });
+            renderFile(ctx, path.join(ctx.projdir, 'something.orz'), outDir).then(()=>{
+                expect(flag).toBe('.orz');
+                expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'something.orz'), new Buffer('This is ORZ file!'));
                 done();
             }).catch(done.fail);
         });

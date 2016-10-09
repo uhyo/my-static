@@ -17,8 +17,8 @@ const mkdirp = require('mkdirp');
 const resolve = require('resolve');
 const globby = require('globby');
 
-export interface ExpressFriendlyRenderFunction{
-    (path: string, options: any, callback: any): void;
+export interface TemplateRenderFunction{
+    (templateString: string, options: any, callback?: any): string;
 }
 export interface RenderFunction{
     (path: string, outDir: string, options?: any): Promise<null | any>;
@@ -36,6 +36,9 @@ interface PreRenderHook{
 interface PostRenderHook{
     (ctx: RenderContext, content: string, target: string, original: string): any;
 }
+interface UnknownExtensionHook{
+    (ctx: RenderContext, ext: string): RenderFunction | null;
+}
 
 export class RenderContext{
     public projdir: string;
@@ -49,6 +52,7 @@ export class RenderContext{
     private postLoadDataHooks: Array<PostLoadDataHook> = [];
     private preRenderHooks: Array<PreRenderHook> = [];
     private postRenderHooks: Array<PostRenderHook> = [];
+    private unknownExtensionHooks: Array<UnknownExtensionHook> = [];
 
     constructor(projdir: string, settings: ProjectSettings){
         this.projdir = projdir;
@@ -58,6 +62,7 @@ export class RenderContext{
     public getRenderer(filepath: string): RenderFunction | null{
         const {
             renderers,
+            settings,
         } = this;
         const ext = path.extname(filepath).toLowerCase();
         // from renderer cache
@@ -69,9 +74,9 @@ export class RenderContext{
         switch (ext){
             // Template Engines
             case '.jade':
-                return (renderers[ext] = renderUtil.makeExpressRenderer(this, this.localRequire('jade').__express));
+                return (renderers[ext] = renderUtil.makeSimpleRenderer(this, this.localRequire('jade').render, true));
             case '.ejs':
-                return (renderers[ext] = renderUtil.makeExpressRenderer(this, this.localRequire('ejs').__express));
+                return (renderers[ext] = renderUtil.makeSimpleRenderer(this, this.localRequire('ejs').render, false));
             case '.dust':
                 return (renderers[ext] = renderUtil.makeDustjsRenderer(this));
 
@@ -87,8 +92,16 @@ export class RenderContext{
             case '.scss':
                 return (renderers[ext] = renderUtil.makeSassRenderer(this));
 
-            default:
+            default: {
+                // Unknown Extension is found.
+                for (let h of this.unknownExtensionHooks){
+                    const f = h(this, ext);
+                    if (f != null){
+                        return (renderers[ext] = f);
+                    }
+                }
                 return null;
+            }
         }
     }
     public addRenderer(ext: string, func: RenderFunction): void{
@@ -224,6 +237,9 @@ export class RenderContext{
     public addPostRenderHook(func: PostRenderHook): void{
         this.postRenderHooks.push(func);
     }
+    public addUnknownExtensionHook(func: UnknownExtensionHook): void{
+        this.unknownExtensionHooks.push(func);
+    }
     // ====================
     // htmlファイル用に拡張子を付け替える
     public getTargetFile(file: string, outDir: string, outExt: string = this.settings.outExt): string{
@@ -246,6 +262,20 @@ export class RenderContext{
             }
         }
         return result;
+    }
+    // renderするべきファイルを読み込む
+    public loadRenderedFile(file: string, binary: boolean = false): Promise<any>{
+        return new Promise((resolve, reject)=>{
+            fs.readFile(file, {
+                encoding: binary ? null : 'utf8',
+            }, (err, data)=>{
+                if (err != null){
+                    reject(err);
+                }else{
+                    resolve(data);
+                }
+            });
+        });
     }
     // do stuff around rendering
     public render(original: string, target: string, renderer: ()=>(null | string | Promise<null | string>)): Promise<any>{
@@ -333,7 +363,7 @@ export class RenderContext{
         });
     }
     // ファイルにかきこみ （変更がないファイルはアレしない）
-    public saveFile(file: string, content: string): Promise<any>{
+    public saveFile(file: string, content: any): Promise<any>{
         return new Promise((resolve, reject)=>{
             fs.writeFile(file, content, err=>{
                 if (err != null){
@@ -469,11 +499,12 @@ export function renderFile(context: RenderContext, f: string, outDir: string): P
 }
 
 // renderers
-namespace renderUtil{
+export namespace renderUtil{
     // expressのあれに対応したrendererを作る
-    export function makeExpressRenderer(ctx: RenderContext, func: ExpressFriendlyRenderFunction): RenderFunction{
+    export function makeExpressRenderer(ctx: RenderContext, func: TemplateRenderFunction): RenderFunction{
         return (file: string, outDir: string, options?: any)=>{
             const target = ctx.getTargetFile(file, outDir);
+            // まずファイルを読み込む
             return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
                 func(file, options, (err, html)=>{
                     if (err != null){
@@ -485,6 +516,34 @@ namespace renderUtil{
             }));
         };
     }
+    // jadeとか
+    export function makeSimpleRenderer(ctx: RenderContext, func: TemplateRenderFunction, needCallback: boolean): RenderFunction{
+        return (file: string, outDir: string, options?: any)=>{
+            const target = ctx.getTargetFile(file, outDir);
+            // まずファイルを読み込む
+            return ctx.render(file, target, ()=>{
+                return ctx.loadRenderedFile(file, false).then(data=>{
+                    return new Promise((resolve, reject)=>{
+                        const o = Object.assign({
+                            filename: file,
+                        }, options);
+                        if (needCallback){
+                            func(data, o, (err, html)=>{
+                                if (err != null){
+                                    reject(err);
+                                }else{
+                                    resolve(html);
+                                }
+                            });
+                        }else{
+                            resolve(func(data, o));
+                        }
+                    });
+                });
+            });
+        };
+    }
+    // export function makeJadeRender(ctx: RenderContext, func: 
     // dustjsのrendererを作る
     export function makeDustjsRenderer(ctx: RenderContext): RenderFunction {
         const dust = ctx.localRequire('dustjs-linkedin');
@@ -499,12 +558,9 @@ namespace renderUtil{
 
         const result: RenderFunction = (file: string, outDir: string, options?: any)=>{
             const target = ctx.getTargetFile(file, outDir);
-            return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
-                fs.readFile(file, (err, buf)=>{
-                    if (err != null){
-                        reject(err);
-                        return;
-                    }
+            return ctx.render(file, target, ()=>{
+                return ctx.loadRenderedFile(file, false)
+                .then(buf=> new Promise((resolve, reject)=>{
                     // onload hook
                     dust.onLoad = (templatepath: string, callback: (err: any, content: string)=>void)=>{
                         // dust用の便利なあれ
@@ -529,8 +585,8 @@ namespace renderUtil{
                         }
                         resolve(html);
                     });
-                });
-            }));
+                }));
+            });
         };
 
         // dustをくっつける (for extension)
@@ -543,39 +599,34 @@ namespace renderUtil{
             const base = path.basename(file);
             const target = path.join(outDir, base);
 
-            return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
-                fs.readFile(file, (err, buf)=>{
-                    if (err != null){
-                        reject(err);
-                        return;
-                    }
-                    resolve(buf.toString());
-                });
-            }));
+            return ctx.render(file, target, ()=>ctx.loadRenderedFile(file, true));
         };
     }
     // sass
     export function makeSassRenderer(ctx: RenderContext): RenderFunction {
         return (file: string, outDir: string)=>{
             const target = ctx.getTargetFile(file, outDir, '.css');
-            return ctx.render(file, target, ()=>new Promise<null | string>((resolve, reject)=>{
-                const sass = ctx.localRequire('node-sass');
-                if (sass == null){
-                    log.verbose('sassRenderer', 'skipped %s : node-sass does not exist', file);
-                    resolve(null);
-                    return;
-                }
-                sass.render({
-                    file,
-                }, (err, result)=>{
-                    if (err != null){
-                        log.error('Error rendering %s: [ %s ]', file, err);
-                        reject(err);
+            return ctx.render(file, target, ()=>{
+                return ctx.loadRenderedFile(file, false).then(data=> new Promise<string | null>((resolve, reject)=>{
+                    const sass = ctx.localRequire('node-sass');
+                    if (sass == null){
+                        log.verbose('sassRenderer', 'skipped %s : node-sass does not exist', file);
+                        resolve(null);
                         return;
                     }
-                    resolve(result.css);
-                });
-            }));
+                    sass.render({
+                        file,
+                        data,
+                    }, (err, result)=>{
+                        if (err != null){
+                            log.error('Error rendering %s: [ %s ]', file, err);
+                            reject(err);
+                            return;
+                        }
+                        resolve(result.css);
+                    });
+                }));
+            });
         };
     }
 
