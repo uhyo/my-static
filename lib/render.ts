@@ -39,6 +39,9 @@ interface PostRenderHook{
 interface UnknownExtensionHook{
     (ctx: RenderContext, ext: string): RenderFunction | null;
 }
+interface LoadFileHook{
+    (ctx: RenderContext, filename: string, binary: boolean): Promise<string | Buffer> | string | Buffer | null;
+}
 interface PostLoadFileHook{
     (ctx: RenderContext, filename: string, content: string | Buffer): Promise<string | Buffer> | string | Buffer | null;
 }
@@ -56,6 +59,7 @@ export class RenderContext{
     private preRenderHooks: Array<PreRenderHook> = [];
     private postRenderHooks: Array<PostRenderHook> = [];
     private unknownExtensionHooks: Array<UnknownExtensionHook> = [];
+    private loadFileHooks: Array<LoadFileHook> = [];
     private postLoadFileHooks: Array<PostLoadFileHook> = [];
 
     constructor(projdir: string, settings: ProjectSettings){
@@ -244,6 +248,9 @@ export class RenderContext{
     public addUnknownExtensionHook(func: UnknownExtensionHook): void{
         this.unknownExtensionHooks.push(func);
     }
+    public addLoadFileHook(func: LoadFileHook): void{
+        this.loadFileHooks.push(func);
+    }
     public addPostLoadFileHook(func: PostLoadFileHook): void{
         this.postLoadFileHooks.push(func);
     }
@@ -272,28 +279,43 @@ export class RenderContext{
     }
     // renderするべきファイルを読み込む
     public loadRenderedFile(file: string, binary: boolean = false): Promise<string | Buffer>{
-        return new Promise((resolve, reject)=>{
-            fs.readFile(file, {
-                encoding: binary ? null : 'utf8',
-            }, (err, data)=>{
-                if (err != null){
-                    reject(err);
-                }else{
-                    // データにhooksをかます
-                    let p: Promise<string | Buffer> = Promise.resolve(data);
-                    for (let f of this.postLoadFileHooks){
-                        p = p.then(data=>{
-                           const p2 = f(this, file, data);
-                           if (p2 == null){
-                               return data;
-                           }else{
-                               return p2;
-                           }
-                        });
+        // 読み込んでくれるHookを探す
+        let loadp: Promise<string | Buffer> | null = null;
+        for (let f of this.loadFileHooks){
+            const p = f(this, file, binary);
+            if (p != null){
+                loadp = Promise.resolve(p);
+                break;
+            }
+        }
+        if (loadp == null){
+            // 該当Hookがなかったので自分で読み込み
+            loadp = new Promise((resolve, reject)=>{
+                fs.readFile(file, {
+                    encoding: binary ? null : 'utf8',
+                }, (err, data)=>{
+                    if (err != null){
+                        reject(err);
+                    }else{
+                        resolve(data);
                     }
-                    resolve(p);
-                }
+                });
             });
+        }
+        return loadp.then(data=>{
+            // データにhooksをかます
+            let p: Promise<string | Buffer> = Promise.resolve(data);
+            for (let f of this.postLoadFileHooks){
+                p = p.then(data=>{
+                    const p2 = f(this, file, data);
+                    if (p2 == null){
+                        return data;
+                    }else{
+                        return p2;
+                    }
+                });
+            }
+            return p;
         });
     }
     // do stuff around rendering

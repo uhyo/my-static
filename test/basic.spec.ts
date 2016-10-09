@@ -224,6 +224,20 @@ describe('Render File', ()=>{
                 done();
             }).catch(done.fail);
         });
+        it('load data hook', done=>{
+            let flags: Array<string> = [];
+            ctx.addLoadFileHook((context, file)=>{
+                flags.push(file);
+                return '<p>cow! {foo}</p>';
+            });
+            renderFile(ctx, path.join(ctx.projdir, 'bar.dust'), outDir).then(()=>{
+                expect(flags).toEqual([
+                    path.join(ctx.projdir, 'bar.dust'),
+                ]);
+                expect(ctx.saveFile).toHaveBeenCalledWith(path.join(outDir, 'bar.html'), '<p>cow! 3</p>');
+                done();
+            }).catch(done.fail);
+        });
         it('post load data hook', done=>{
             let flags: Array<string> = [];
             ctx.addPostLoadFileHook((context, file, data)=>{
