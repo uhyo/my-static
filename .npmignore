@@ -1,4 +1,7 @@
-node_modules/
 lib/
 typings/
 test/
+dtsm.json
+run-jasmine.js
+tsconfig.json
+tslint.json
