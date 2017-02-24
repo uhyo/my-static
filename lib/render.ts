@@ -34,7 +34,7 @@ interface PreRenderHook{
     } | null;
 }
 interface PostRenderHook{
-    (ctx: RenderContext, content: string, target: string, original: string): any;
+    (ctx: RenderContext, content: string | Buffer, target: string, original: string): any;
 }
 interface UnknownExtensionHook{
     (ctx: RenderContext, ext: string): RenderFunction | null;
@@ -319,7 +319,7 @@ export class RenderContext{
         });
     }
     // do stuff around rendering
-    public render(original: string, target: string, renderer: ()=>(null | string | Promise<null | string>)): Promise<any>{
+    public render(original: string, target: string, renderer: ()=>(null | string | Buffer | Promise<null | string | Buffer>)): Promise<any>{
         return new Promise((resolve, reject)=>{
             const doRender = ()=>{
                 // request a render.
@@ -415,8 +415,8 @@ export class RenderContext{
             });
         });
     }
-    private applyPostRenderHooks(content: string, target: string, original: string): Promise<string>{
-        let h: (i: number)=>(content: string)=>Promise<string>;
+    private applyPostRenderHooks(content: string | Buffer, target: string, original: string): Promise<string>{
+        let h: (i: number)=>(content: string | Buffer)=>Promise<string>;
         h = (i: number)=>{
             const hook = this.postRenderHooks[i];
             if (hook == null){
@@ -546,7 +546,7 @@ export namespace renderUtil{
         return (file: string, outDir: string, options?: any)=>{
             const target = ctx.getTargetFile(file, outDir);
             // まずファイルを読み込む
-            return ctx.render(file, target, ()=>new Promise((resolve, reject)=>{
+            return ctx.render(file, target, ()=>new Promise<string>((resolve, reject)=>{
                 func(file, options, (err, html)=>{
                     if (err != null){
                         reject(err);
@@ -599,7 +599,7 @@ export namespace renderUtil{
 
         const result: RenderFunction = (file: string, outDir: string, options?: any)=>{
             const target = ctx.getTargetFile(file, outDir);
-            return ctx.render(file, target, ()=> new Promise((resolve, reject)=>{
+            return ctx.render(file, target, ()=> new Promise<string>((resolve, reject)=>{
                 // onload hook
                 dust.onLoad = (templatepath: string, callback: (err: any, content: string | null)=>void)=>{
                     // dust用の便利なあれ
