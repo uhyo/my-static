@@ -40,11 +40,9 @@
     "in-publish": "^2.0.0",
     "jasmine": "^2.4.1",
     "jasmine-spec-reporter": "^2.5.0",
-    "mkdirp": "^0.5.1",
-    "mock-fs": "^3.9.0",
+    "mock-fs": "3.10.x",
     "mountfs": "^0.2.1",
     "npm-run-all": "^2.1.1",
-    "pkg-dir": "^1.0.0",
     "rimraf": "^2.5.2",
     "tslint": "^3.11.0",
     "typescript": "^2.0.0",
@@ -63,7 +61,9 @@
     "globby": "^5.0.0",
     "jade": "^1.11.0",
     "minimatch": "^3.0.2",
+    "mkdirp": "^0.5.1",
     "my-load-data": "^1.1.0-rc1",
+    "pkg-dir": "^1.0.0",
     "resolve": "^1.1.7"
   }
 }
