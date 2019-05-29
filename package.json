@@ -1,6 +1,6 @@
 {
   "name": "my-static",
-  "version": "1.1.1",
+  "version": "2.0.0",
   "description": "My static website generator for me.",
   "main": "dist/lib/index.js",
   "bin": {
@@ -8,7 +8,7 @@
     "my-static": "./bin/myst.js"
   },
   "engines": {
-    "node": ">=4.0.0"
+    "node": ">=8.0.0"
   },
   "scripts": {
     "build": "npm-run-all clean build:tsc lint",
