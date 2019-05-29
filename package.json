@@ -1,6 +1,6 @@
 {
   "name": "my-static",
-  "version": "1.1.1",
+  "version": "2.0.0",
   "description": "My static website generator for me.",
   "main": "dist/lib/index.js",
   "bin": {
@@ -8,7 +8,7 @@
     "my-static": "./bin/myst.js"
   },
   "engines": {
-    "node": ">=4.0.0"
+    "node": ">=8.0.0"
   },
   "scripts": {
     "build": "npm-run-all clean build:tsc lint",
@@ -37,33 +37,34 @@
   },
   "homepage": "https://github.com/uhyo/my-static",
   "devDependencies": {
+    "@types/jasmine": "^3.3.13",
+    "@types/node": "^12.0.3",
     "in-publish": "^2.0.0",
     "jasmine": "^2.4.1",
     "jasmine-spec-reporter": "^2.5.0",
     "mock-fs": "3.10.x",
     "mountfs": "^0.2.1",
-    "npm-run-all": "^2.1.1",
+    "npm-run-all": "^4.1.5",
     "rimraf": "^2.5.2",
     "tslint": "^3.11.0",
-    "typescript": "^2.0.0",
+    "typescript": "^3.4.5",
     "watch": "^0.19.1"
   },
   "dependencies": {
-    "cli": "^0.11.2",
+    "cli": "^1.0.1",
     "colors": "^1.1.2",
     "dustjs-helpers": "^1.7.3",
     "dustjs-linkedin": "2.7.x",
     "ejs": "^2.4.2",
-    "es6-promise": "^3.2.1",
     "express": "^4.14.0",
-    "find-up": "^1.1.2",
+    "find-up": "^4.0.0",
     "gaze": "^1.1.0",
-    "globby": "^5.0.0",
+    "globby": "^9.2.0",
     "jade": "^1.11.0",
     "minimatch": "^3.0.2",
     "mkdirp": "^0.5.1",
     "my-load-data": "^1.1.0-rc1",
-    "pkg-dir": "^1.0.0",
+    "pkg-dir": "^4.2.0",
     "resolve": "^1.1.7"
   }
 }

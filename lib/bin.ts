@@ -1,7 +1,6 @@
-///<reference path="../typings/bundle.d.ts" />
-const path = require('path');
-const pkgDir = require('pkg-dir');
-const cli = require('cli');
+import * as path from 'path';
+import * as pkgDir from 'pkg-dir';
+import * as cli from 'cli';
 
 import {
     BuildOptions,
@@ -14,7 +13,7 @@ import * as log from './log';
 
 cli.enable('version');
 
-const pkg = require(path.join(pkgDir.sync(__dirname), 'package.json'));
+const pkg = require(path.join(pkgDir.sync(__dirname) || '.', 'package.json'));
 
 cli.parse({
     project: ['p', 'Project file', 'path'],

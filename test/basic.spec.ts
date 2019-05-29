@@ -1,5 +1,3 @@
-/// <reference path='../typings/bundle.d.ts' />
-
 import {
     findProject,
 } from '../lib/main';
@@ -60,7 +58,8 @@ foonum: 10`,
             expect(projdir).toBe(proj1Dir);
             expect(settings).toEqual({
                 data: 'data/',
-            });
+                // TODO: TypeScript version is very old. Needs thorough rewrite.
+            } as any);
             done();
         }).catch(done.fail);
     });

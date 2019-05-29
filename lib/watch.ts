@@ -1,4 +1,3 @@
-///<reference path="../typings/bundle.d.ts" />
 // watch utility.
 import {
     EventEmitter,

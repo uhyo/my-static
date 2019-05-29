@@ -1,4 +1,3 @@
-/// <reference path='../typings/bundle.d.ts' />
 // default config
 
 const path = require('path');

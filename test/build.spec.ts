@@ -1,5 +1,3 @@
-/// <reference path='../typings/bundle.d.ts' />
-
 import {
     build,
 } from '../lib/main';
