@@ -1,5 +1,3 @@
-///<reference path="../typings/bundle.d.ts" />
-
 // Just logging features.
 const colors = require('colors');
 
