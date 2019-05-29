@@ -13,7 +13,7 @@ import * as log from './log';
 
 cli.enable('version');
 
-const pkg = require(path.join(pkgDir.sync(__dirname), 'package.json'));
+const pkg = require(path.join(pkgDir.sync(__dirname) || '.', 'package.json'));
 
 cli.parse({
     project: ['p', 'Project file', 'path'],
