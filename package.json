@@ -54,7 +54,7 @@
     "cli": "^1.0.1",
     "colors": "^1.1.2",
     "dustjs-helpers": "^1.7.3",
-    "dustjs-linkedin": "2.7.x",
+    "dustjs-linkedin": "3.0.x",
     "ejs": "^2.4.2",
     "express": "^4.14.0",
     "find-up": "^4.0.0",
